@@ -1,4 +1,5 @@
 import { test } from '@playwright/test';
+import { getOtpFromGmail } from '../utils/auth-gmail';
 
 async function waitForAndClick(page: any, selector: string, label: string, timeoutMs = 10000) {
   const locator = page.locator(selector).first();
@@ -64,4 +65,21 @@ test('ComBank login', async ({ page }) => {
 
   await page.waitForTimeout(3000);
   await waitForAndClick(page, 'button#resendButton', 'Resend OTP button again', 8000);
+
+  const otp = await getOtpFromGmail('SecurityVerification@combank.net', null, 10, 30000);
+  if (!otp) {
+    throw new Error('OTP not found in Gmail');
+  }
+  console.log('OTP received from email:', otp);
+  await fillOtpInputs(page, otp);
 });
+
+async function fillOtpInputs(page: any, otp: string) {
+  const digits = otp.trim().split('');
+  for (let i = 0; i < digits.length; i++) {
+    const inputSelector = `#otp${i + 1}`;
+    await page.waitForSelector(inputSelector, { state: 'visible', timeout: 10000 });
+    await page.focus(inputSelector);
+    await page.type(inputSelector, digits[i], { delay: 50 });
+  }
+}

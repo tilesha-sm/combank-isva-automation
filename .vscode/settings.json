@@ -4,5 +4,6 @@
         "domcontentloaded",
         "networkidle",
         "testmas"
-    ]
+    ],
+    "robotcode.disableExtension": true
 }
