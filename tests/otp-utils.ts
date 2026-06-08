@@ -49,7 +49,7 @@ async function findVisibleOtpInputs(page: Page) {
   return [] as any[];
 }
 
-export async function waitForOtpInputs(page: Page, timeoutMs = 30000) {
+export async function waitForOtpInputs(page: Page, timeoutMs = 90000) {
   const deadline = Date.now() + timeoutMs;
 
   while (Date.now() < deadline) {

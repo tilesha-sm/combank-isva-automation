@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
 import { getForgotPasswordCredential, DEFAULT_EMAIL_SENDER } from './credentials';
 import { getOtpFromGmail } from '../utils/auth-gmail';
-import { fillOtpInputs, waitForAndClick } from './otp-utils';
-import { START_URL, is502Page, resetToStart } from './flow-utils';
+import { fillOtpInputs, waitForAndClick, waitForOtpInputs } from './otp-utils';
+import { START_URL, gotoWith502Check, is502Page, resetToStart } from './flow-utils';
 
 
 test.setTimeout(90000);
@@ -14,7 +14,7 @@ test('Forgot Password flow', async ({ page }) => {
     try {
       await page.context().clearCookies();
 
-      await page.goto(START_URL, {
+      await gotoWith502Check(page, START_URL, {
         waitUntil: 'load',
         timeout: 120000,
       });
@@ -67,10 +67,12 @@ test('Forgot Password flow', async ({ page }) => {
         return;
       }
 
-      const emailSelected = await waitForAndClick(page, '#email', 'Email OTP option', 15000);
+      const emailSelected = await waitForAndClick(page, '#email', 'Email OTP option', 45000);
       if (!emailSelected) {
         throw new Error('Email OTP option not available in forgot-password flow.');
       }
+
+      await waitForOtpInputs(page, 90000);
 
       const otp = await getOtpFromGmail(DEFAULT_EMAIL_SENDER, null, 10, 30000);
       if (!otp) {
@@ -79,6 +81,10 @@ test('Forgot Password flow', async ({ page }) => {
 
       console.log('OTP received from email:', otp);
       await fillOtpInputs(page, otp);
+
+      if (await is502Page(page)) {
+        throw new Error('Detected 502 Bad Gateway after OTP entry');
+      }
 
       // Completed successfully
       return;

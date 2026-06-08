@@ -21,12 +21,20 @@ export async function is502Page(page: Page): Promise<boolean> {
   }
 }
 
+export async function gotoWith502Check(page: Page, url: string, options: Parameters<Page['goto']>[1] = {}) {
+  const response = await page.goto(url, options);
+  if (response?.status() === 502) {
+    throw new Error('Detected 502 Bad Gateway on navigation');
+  }
+  return response;
+}
+
 export async function resetToStart(page: Page) {
   try {
     await page.context().clearCookies();
   } catch {}
   try {
-    await page.goto(START_URL, { waitUntil: 'load', timeout: 120000 });
+    await gotoWith502Check(page, START_URL, { waitUntil: 'load', timeout: 120000 });
     await page.waitForLoadState('networkidle', { timeout: 120000 }).catch(() => {});
   } catch {
     // ignore — caller will detect 502 or failure
