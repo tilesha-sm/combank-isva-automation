@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { getForgotPasswordCredential } from './credentials';
 
 async function waitForAndClick(page: any, selector: string, label: string, timeoutMs = 10000) {
   const locator = page.locator(selector).first();
@@ -36,7 +37,8 @@ test('Forgot Password flow', async ({ page }) => {
   await fpUsername.first().waitFor({ state: 'visible', timeout: 30000 });
 
   // Username
-  await fpUsername.first().fill('pasanqa1');
+  const forgotCredentials = getForgotPasswordCredential();
+  await fpUsername.first().fill(forgotCredentials.username);
 
   // Next
   await page.locator('#next').click();

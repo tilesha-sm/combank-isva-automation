@@ -3,6 +3,7 @@
         "Combank",
         "domcontentloaded",
         "networkidle",
+        "pasanqa",
         "testmas"
     ],
     "robotcode.disableExtension": true

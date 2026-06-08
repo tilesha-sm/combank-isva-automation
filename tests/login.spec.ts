@@ -1,5 +1,6 @@
 import { test } from '@playwright/test';
 import { getOtpFromGmail } from '../utils/auth-gmail';
+import { getLoginCredentials } from './credentials';
 
 async function waitForAndClick(page: any, selector: string, label: string, timeoutMs = 10000) {
   const locator = page.locator(selector).first();
@@ -28,8 +29,9 @@ test('ComBank login', async ({ page }) => {
   await page.waitForLoadState('networkidle');
 
   // Login
-  await page.locator('#username').fill('testmas7');
-  await page.locator('input[type="password"]').fill('Combank@123');
+  const loginCredentials = getLoginCredentials();
+  await page.locator('#username').fill(loginCredentials.username);
+  await page.locator('input[type="password"]').fill(loginCredentials.password);
   await page.locator('#loginBtn').click();
   await page.waitForLoadState('load');
   await page.waitForLoadState('networkidle');
