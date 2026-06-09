@@ -8,7 +8,7 @@ export type ForgotPasswordCredential = {
 };
 
 export const LOGIN_CREDENTIALS: LoginCredential[] = [
-  { username: 'pasanqa1', password: 'Combank@123' },
+  { username: 'Tilesha04', password: 'Combank@123' },
   
 ];
 
