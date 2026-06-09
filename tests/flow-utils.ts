@@ -2,6 +2,16 @@ import { Page } from '@playwright/test';
 
 export const START_URL = 'https://uatisvaext.combank.net/sso.html';
 
+const CLOSED_PAGE_REGEX = /closed/i;
+
+export function isClosedPageError(error: unknown): boolean {
+  const message =
+    error && typeof error === 'object' && 'message' in error
+      ? (error as any).message
+      : String(error);
+  return CLOSED_PAGE_REGEX.test(message) || /Target page, context or browser has been closed/i.test(message as string);
+}
+
 export async function is502Page(page: Page): Promise<boolean> {
   try {
     // Quick checks: title, visible texts
@@ -29,14 +39,30 @@ export async function gotoWith502Check(page: Page, url: string, options: Paramet
   return response;
 }
 
-export async function resetToStart(page: Page) {
+export async function resetToStart(page: Page): Promise<Page> {
+  try {
+    if (page.isClosed()) {
+      return page.context().newPage();
+    }
+  } catch {
+    // If page state cannot be read, continue and attempt navigation.
+  }
+
   try {
     await page.context().clearCookies();
   } catch {}
+
   try {
+    if (page.isClosed()) {
+      return page.context().newPage();
+    }
     await gotoWith502Check(page, START_URL, { waitUntil: 'load', timeout: 120000 });
     await page.waitForLoadState('networkidle', { timeout: 120000 }).catch(() => {});
-  } catch {
-    // ignore — caller will detect 502 or failure
+    return page;
+  } catch (error) {
+    if (isClosedPageError(error)) {
+      return page.context().newPage();
+    }
+    return page;
   }
 }
