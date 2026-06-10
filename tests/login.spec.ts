@@ -43,16 +43,19 @@ test('ComBank login', async ({ page }) => {
       await pageToUse.waitForLoadState('networkidle');
       await pageToUse.waitForTimeout(2000);
 
-      await waitForAndClick(pageToUse, '#email', 'Email OTP option', 45000);
+      // First: Click Mobile OTP, wait 40s, then resend
+      await waitForAndClick(pageToUse, 'button#sms', 'Mobile OTP option', 45000);
+      await pageToUse.waitForTimeout(40000);
+      await waitForAndClick(pageToUse, 'button#resendButton', 'Resend OTP button for Mobile', 45000);
+      
+      // Second: Switch to Email OTP, wait 40s, then resend
       await pageToUse.waitForTimeout(2500);
       await waitForAndClick(pageToUse, 'button#alt_btn', 'Log in another way option', 45000);
-      await waitForAndClick(pageToUse, 'button#sms', 'Mobile OTP option', 45000);
-      await pageToUse.waitForTimeout(3000);
-      await waitForAndClick(pageToUse, 'button#resendButton', 'Resend OTP button', 45000);
-      await waitForAndClick(pageToUse, 'button#alt_btn', 'Log in another way option again', 45000);
-      await waitForAndClick(pageToUse, 'button#sms', 'Mobile OTP option again', 45000);
-      await pageToUse.waitForTimeout(3000);
-      await waitForAndClick(pageToUse, 'button#resendButton', 'Resend OTP button again', 45000);
+      await waitForAndClick(pageToUse, '#email', 'Email OTP option', 45000);
+      await pageToUse.waitForTimeout(40000);
+      await waitForAndClick(pageToUse, 'button#resendButton', 'Resend OTP button for Email', 45000);
+      
+      // Wait for OTP input fields and fetch from email
       await waitForOtpInputs(pageToUse, 90000);
 
       const otp = await getOtpFromGmail(DEFAULT_EMAIL_SENDER, null, 10, 30000);
