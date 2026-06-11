@@ -14,7 +14,9 @@ export default defineConfig({
     ['html', { outputFolder: 'playwright-report', open: 'never' }],
   ],
 
+  outputDir: 'test-artifacts',
   use: {
+    screenshot: 'only-on-failure',
     trace: 'on-first-retry',
   },
 
