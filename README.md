@@ -92,7 +92,7 @@ npx playwright test tests/forgot-password.spec.ts
 - `utils/` - helper modules for login, OTP, and Gmail interaction
 - `playwright.config.ts` - Playwright configuration and project settings
 - `package.json` - npm scripts and dependencies
-- `login_negative_screens/` - centralized screenshot artifacts for negative test flows
+- `test-artifacts/screenshots/` - centralized screenshot artifacts for test failures and validation states
 
 ## Notes
 

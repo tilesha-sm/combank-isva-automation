@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { fillOtpInputs, waitForAndClick, waitForOtpInputs } from './otp-utils';
 import { resetToStart as resetFlowToStart } from './flow-utils';
+import { saveScreenshot } from './screenshot-utils';
 
 const VALID_USERNAME = 'Tilesha04';
 const VALID_PASSWORD = 'Combank@123';
@@ -24,7 +25,7 @@ test.describe('Login negative cases', () => {
     await page.locator(PASSWORD_FIELD).fill('');
 
     await expect(page.locator(LOGIN_BUTTON)).toBeDisabled();
-    await page.screenshot({ path: 'login_negative_screens/empty-fields-disabled.png', fullPage: true });
+    await saveScreenshot(page, 'login-empty-fields-disabled');
     await expect(page.locator(USERNAME_FIELD)).toBeVisible();
   });
 
@@ -37,7 +38,7 @@ test.describe('Login negative cases', () => {
 
     const loginError = page.locator('text=/invalid|incorrect|wrong|failed/i');
     await expect(loginError.first()).toBeVisible({ timeout: 15000 });
-    await page.screenshot({ path: 'login_negative_screens/wrong-password-error.png', fullPage: true });
+    await saveScreenshot(page, 'login-wrong-password-error');
     await expect(page.locator(USERNAME_FIELD)).toBeVisible();
   });
 
@@ -88,11 +89,11 @@ test.describe('Login negative cases', () => {
 
       if (attempt < 3) {
         await expect(otpError.first()).toBeVisible({ timeout: 20000 });
-        await page.screenshot({ path: `login_negative_screens/login-wrong-otp-attempt-${attempt}.png`, fullPage: true });
+        await saveScreenshot(page, `login-wrong-otp-attempt-${attempt}`);
       } else {
         await expect(lockError.first()).toBeVisible({ timeout: 30000 });
         lockDetected = true;
-        await page.screenshot({ path: 'login_negative_screens/login-otp-locked-final.png', fullPage: true });
+        await saveScreenshot(page, 'login-otp-locked-final');
       }
     }
 

@@ -6,11 +6,8 @@ export async function waitForAndClick(page: Page, selector: string, label: strin
   try {
     await locator.waitFor({ state: 'visible', timeout: timeoutMs });
     await locator.click({ force: true });
-    console.log(`${label} clicked`);
     return true;
-  } catch (error: unknown) {
-    const message = error && typeof error === 'object' && 'message' in error ? (error as any).message : String(error);
-    console.log(`${label} not available within ${timeoutMs}ms`, message);
+  } catch {
     return false;
   }
 }
@@ -151,6 +148,6 @@ export async function fillOtpInputs(page: Page, otp: string) {
   }
 
   if (fillCount < digits.length) {
-    console.log(`OTP string has ${digits.length} digits but only ${fillCount} input fields were available.`);
+    // If there are fewer inputs than digits, the remaining digits cannot be filled.
   }
 }

@@ -76,16 +76,13 @@ async function saveToken(client: Auth.OAuth2Client): Promise<void> {
 async function authorize(): Promise<Auth.OAuth2Client> {
   const saved = await loadSavedToken();
   if (saved) {
-    console.log("Using saved token...");
     try {
       const tokenResponse = await (saved as any).getAccessToken();
       if (!tokenResponse || !tokenResponse.token) {
         throw new Error("Saved token did not return a valid access token.");
       }
-      console.log("Saved token is valid.");
       return saved;
-    } catch (error) {
-      console.log("Saved token is invalid or expired; deleting token and reauthorizing.");
+    } catch {
       try {
         fs.unlinkSync(TOKEN_PATH);
       } catch {
@@ -94,8 +91,6 @@ async function authorize(): Promise<Auth.OAuth2Client> {
     }
   }
 
-  console.log("No token found → starting OAuth login...");
-
   const client = await authenticate({
     scopes: SCOPES,
     keyfilePath: CREDENTIALS_PATH,
@@ -103,17 +98,12 @@ async function authorize(): Promise<Auth.OAuth2Client> {
 
   if (client.credentials) {
     await saveToken(client as unknown as Auth.OAuth2Client);
-    console.log("Token saved successfully.");
   }
 
   try {
-    const tokenResponse = await (client as any).getAccessToken();
-    console.log(
-      "New token fetched:",
-      tokenResponse?.token ? "yes" : "no"
-    );
-  } catch (error) {
-    console.log("Warning: could not verify access token after authentication.", error);
+    await (client as any).getAccessToken();
+  } catch {
+    // ignore verification failures after authentication
   }
 
   return client as unknown as Auth.OAuth2Client;
@@ -166,8 +156,6 @@ export async function getOtpFromGmail(
     gmail = google.gmail({ version: "v1", auth });
   }
 
-  console.log("Waiting for OTP email...");
-
   while (Date.now() < deadline) {
     let list;
     try {
@@ -180,7 +168,6 @@ export async function getOtpFromGmail(
       });
     } catch (error: any) {
       if (isAuthError(error)) {
-        console.log("Auth error detected; retrying authorization...");
         await reauthorize();
         continue;
       }
@@ -199,7 +186,6 @@ export async function getOtpFromGmail(
         });
       } catch (error: any) {
         if (isAuthError(error)) {
-          console.log("Auth error detected while fetching a message; retrying authorization...");
           await reauthorize();
           continue;
         }
@@ -218,24 +204,18 @@ export async function getOtpFromGmail(
         if (expectedReference) {
           const ref = extractReference(combined);
           if (ref && String(ref) === String(expectedReference)) {
-            console.log(`✅ OTP Found (matching reference ${expectedReference}): ${otp}`);
             return otp;
-          } else {
-            console.log(`Found OTP but reference mismatch (expected: ${expectedReference}, found: ${ref}).`);
-            continue;
           }
+          continue;
         }
 
-        console.log(`✅ OTP Found: ${otp}`);
         return otp;
       }
     }
 
-    console.log("No OTP yet... retrying in 5s");
     await new Promise((r) => setTimeout(r, 5000));
   }
 
-  console.log("❌ Timeout: OTP not found");
   return null;
 }
 
