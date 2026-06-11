@@ -9,5 +9,10 @@
         "testmas",
         "Tilesha"
     ],
-    "robotcode.disableExtension": true
+    "robotcode.disableExtension": true,
+    "chat.tools.terminal.autoApprove": {
+        "git add": true,
+        "git commit": true,
+        "git push": true
+    }
 }

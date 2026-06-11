@@ -28,6 +28,7 @@ test.describe('Forgot Password negative cases', () => {
 
     const validation = page.locator('text=/username.*required|please enter.*username|required/i');
     await expect(validation.first()).toBeVisible({ timeout: 15000 });
+    await page.screenshot({ path: 'login_negative_screens/fp-empty-username-error.png', fullPage: true });
 
     await expect(fpUsername).toBeVisible();
   });
@@ -46,6 +47,7 @@ test.describe('Forgot Password negative cases', () => {
 
     const notFoundError = page.locator('text=/please provide a valid username|not found|does not exist|invalid username|username.*invalid/i');
     await expect(notFoundError.first()).toBeVisible({ timeout: 20000 });
+    await page.screenshot({ path: 'login_negative_screens/fp-nonexistent-user-error.png', fullPage: true });
     await expect(fpUsername).toBeVisible();
   });
 
@@ -64,6 +66,7 @@ test.describe('Forgot Password negative cases', () => {
     const invalidFormatError = page.locator('text=/invalid username|special characters|please enter a valid username|please provide a valid username|username.*invalid|format.*username|username.*format/i');
     await expect(invalidFormatError.first()).toBeVisible({ timeout: 20000 });
     await expect(page.locator('#next')).toBeDisabled({ timeout: 15000 });
+    await page.screenshot({ path: 'login_negative_screens/fp-invalid-format-error.png', fullPage: true });
 
     await expect(fpUsername).toBeVisible();
   });
@@ -100,10 +103,11 @@ test.describe('Forgot Password negative cases', () => {
 
       if (attempt < 3) {
         await expect(otpError.first()).toBeVisible({ timeout: 20000 });
+        await page.screenshot({ path: `login_negative_screens/fp-wrong-otp-attempt-${attempt}.png`, fullPage: true });
       } else {
         await expect(lockError.first()).toBeVisible({ timeout: 30000 });
         lockDetected = true;
-        await page.screenshot({ path: 'login_negative_screens/otp-locked-forgot.png', fullPage: true });
+        await page.screenshot({ path: 'login_negative_screens/fp-otp-locked-final.png', fullPage: true });
       }
     }
 
