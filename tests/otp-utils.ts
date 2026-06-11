@@ -16,17 +16,26 @@ export async function waitForAndClick(page: Page, selector: string, label: strin
 }
 
 async function findVisibleOtpInputs(page: Page) {
-  const candidateSelectors = [
+    const strongSelectors = [
     '#otp1,#otp2,#otp3,#otp4,#otp5,#otp6',
+    'input[autocomplete="one-time-code"],input[id*="otp"],input[name*="otp"],input[placeholder*="OTP"],input[aria-label*="OTP"],input[aria-label*="One-time Password"],input[aria-label*="verification code"],input[aria-label*="Verification code"]',
     'input[maxlength="1"][type="tel"],input[maxlength="1"][inputmode="numeric"],input[maxlength="1"][pattern="\\d*"]',
-    'input[autocomplete="one-time-code"],input[autocomplete="one-time-code"]',
-    'input[id*="otp"],input[name*="otp"],input[placeholder*="OTP"],input[aria-label*="OTP"],input[aria-label*="One-time Password"]',
-    'input[type="tel"],input[type="text"]',
   ];
+  const genericSelectors = ['input[type="tel"],input[type="text"]'];
+  const loginFieldPattern = /user(name)?|email|pass(word)?|login|search|name/i;
 
-  // Search in main frame and any child frames to find visible OTP inputs
+  async function isLikelyOtpInput(locator: any) {
+    const id = (await locator.getAttribute('id')) || '';
+    const name = (await locator.getAttribute('name')) || '';
+    const placeholder = (await locator.getAttribute('placeholder')) || '';
+    const ariaLabel = (await locator.getAttribute('aria-label')) || '';
+    const value = `${id} ${name} ${placeholder} ${ariaLabel}`;
+    return !loginFieldPattern.test(value);
+  }
+
   const frames = page.frames();
-  for (const selector of candidateSelectors) {
+
+  for (const selector of strongSelectors) {
     for (const frame of frames) {
       const locator = frame.locator(selector as any);
       const count = await locator.count();
@@ -35,9 +44,31 @@ async function findVisibleOtpInputs(page: Page) {
       const visibleLocators = [] as any[];
       for (let i = 0; i < count; i++) {
         const candidate = locator.nth(i);
-        if (await candidate.isVisible().catch(() => false)) {
+        const isEditable = await candidate.isEditable().catch(() => false);
+        if (isEditable) {
           visibleLocators.push(candidate);
         }
+      }
+
+      if (visibleLocators.length > 0) {
+        return visibleLocators;
+      }
+    }
+  }
+
+  for (const selector of genericSelectors) {
+    for (const frame of frames) {
+      const locator = frame.locator(selector as any);
+      const count = await locator.count();
+      if (count === 0) continue;
+
+      const visibleLocators = [] as any[];
+      for (let i = 0; i < count; i++) {
+        const candidate = locator.nth(i);
+        const isEditable = await candidate.isEditable().catch(() => false);
+        if (!isEditable) continue;
+        if (!(await isLikelyOtpInput(candidate))) continue;
+        visibleLocators.push(candidate);
       }
 
       if (visibleLocators.length > 0) {

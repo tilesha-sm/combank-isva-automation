@@ -1,3 +1,9 @@
+process.on('warning', (warning) => {
+  if (warning.name === 'DeprecationWarning' && /punycode/i.test(warning.message)) {
+    return;
+  }
+});
+
 import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
@@ -7,6 +13,10 @@ export default defineConfig({
     ['list'],
     ['html', { outputFolder: 'playwright-report', open: 'never' }],
   ],
+
+  use: {
+    screenshot: 'only-on-failure',
+  },
 
   projects: [
     {

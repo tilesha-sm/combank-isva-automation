@@ -63,9 +63,19 @@ test('Forgot Password flow', async ({ page }) => {
         return;
       }
 
-      const emailSelected = await waitForAndClick(pageToUse, '#email', 'Email OTP option', 45000);
-      if (!emailSelected) {
-        throw new Error('Email OTP option not available in forgot-password flow.');
+      const sessionTimeoutMsg = pageToUse.locator('text=/session.*timeout|Your session has ended|login again to continue/i');
+      if (await sessionTimeoutMsg.isVisible({ timeout: 5000 }).catch(() => false)) {
+        throw new Error('Session timed out on forgot-password flow before OTP selection.');
+      }
+
+      const emailSelected = await waitForAndClick(pageToUse, 'text=/Request OTP to email/i', 'Email OTP option', 45000);
+      let otpMethodSelected = emailSelected;
+      if (!otpMethodSelected) {
+        otpMethodSelected = await waitForAndClick(pageToUse, 'text=/Request OTP to mobile/i', 'Mobile OTP option', 45000);
+      }
+
+      if (!otpMethodSelected) {
+        throw new Error('OTP option not available in forgot-password flow.');
       }
 
       await waitForOtpInputs(pageToUse, 90000);
@@ -88,8 +98,9 @@ test('Forgot Password flow', async ({ page }) => {
       const found502 = await is502Page(currentPage).catch(() => false);
       const msg = String(err || '');
       const closedError = /closed/i.test(msg) || /Target page, context or browser has been closed/i.test(msg);
-      if ((found502 || closedError) && attempt < MAX_ATTEMPTS) {
-        console.log(`Detected 502/closed browser — restarting flow (attempt ${attempt + 1}/${MAX_ATTEMPTS})`);
+      const sessionTimeoutError = /session.*timeout|session has ended|login again/i.test(msg);
+      if ((found502 || closedError || sessionTimeoutError) && attempt < MAX_ATTEMPTS) {
+        console.log(`Detected 502/closed/browser timeout — restarting flow (attempt ${attempt + 1}/${MAX_ATTEMPTS})`);
         currentPage = await resetToStart(currentPage);
         continue;
       }
