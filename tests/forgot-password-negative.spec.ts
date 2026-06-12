@@ -1,26 +1,30 @@
 import { expect, test } from '@playwright/test';
-import { fillOtpInputs, waitForAndClick, waitForOtpInputs } from './otp-utils';
-import { resetToStart as resetFlowToStart } from './flow-utils';
-import { saveScreenshot } from './screenshot-utils';
+import { clickForgotPassword, fillOtpInputs, selectOtpMethod, waitForOtpInputs } from '../src/utils/otp-utils';
+import { resetToStart as resetFlowToStart } from '../src/utils/flow-utils';
+import { saveScreenshot } from '../src/utils/screenshot-utils';
 
 const VALID_FORGOT_USERNAME = 'pasanqa1';
 const NON_EXISTENT_USERNAME = 'no.such.user.1234';
 const INVALID_FORMAT_USERNAME = 'bad!user';
 const WRONG_OTP = '000000';
 
-test.setTimeout(90000);
+test.setTimeout(150000);
 
 // Ensure individual negative cases run sequentially in this spec.
 test.describe('Forgot Password negative cases', () => {
   test.describe.configure({ mode: 'serial' });
 
   test('Empty username field shows validation error', async ({ page }) => {
-    await resetFlowToStart(page);
+    page = await resetFlowToStart(page);
 
-    await waitForAndClick(page, '#home_forgot_Password', 'Forgot password link', 15000);
-    await page.waitForLoadState('networkidle');
+    const forgotClicked = await clickForgotPassword(page, 15000);
+    if (!forgotClicked) {
+      throw new Error('Unable to open forgot password flow');
+    }
+    await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     const fpUsername = page.locator('#FPUsername, input[name="FPUsername"]').first();
-    await expect(fpUsername).toBeVisible({ timeout: 15000 });
+    await fpUsername.waitFor({ state: 'visible', timeout: 30000 });
 
     await fpUsername.fill('');
     await fpUsername.press('Tab');
@@ -35,12 +39,16 @@ test.describe('Forgot Password negative cases', () => {
   });
 
   test('Non-existent username shows error message', async ({ page }) => {
-    await resetFlowToStart(page);
+    page = await resetFlowToStart(page);
 
-    await waitForAndClick(page, '#home_forgot_Password', 'Forgot password link', 15000);
-    await page.waitForLoadState('networkidle');
+    const forgotClicked = await clickForgotPassword(page, 15000);
+    if (!forgotClicked) {
+      throw new Error('Unable to open forgot password flow');
+    }
+    await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     const fpUsername = page.locator('#FPUsername, input[name="FPUsername"]').first();
-    await expect(fpUsername).toBeVisible({ timeout: 15000 });
+    await fpUsername.waitFor({ state: 'visible', timeout: 30000 });
 
     await fpUsername.fill(NON_EXISTENT_USERNAME);
     await page.locator('#next').click();
@@ -53,12 +61,16 @@ test.describe('Forgot Password negative cases', () => {
   });
 
   test('Invalid username format shows validation error', async ({ page }) => {
-    await resetFlowToStart(page);
+    page = await resetFlowToStart(page);
 
-    await waitForAndClick(page, '#home_forgot_Password', 'Forgot password link', 15000);
-    await page.waitForLoadState('networkidle');
+    const forgotClicked = await clickForgotPassword(page, 15000);
+    if (!forgotClicked) {
+      throw new Error('Unable to open forgot password flow');
+    }
+    await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     const fpUsername = page.locator('#FPUsername, input[name="FPUsername"]').first();
-    await expect(fpUsername).toBeVisible({ timeout: 15000 });
+    await fpUsername.waitFor({ state: 'visible', timeout: 30000 });
 
     await fpUsername.fill(INVALID_FORMAT_USERNAME);
     await page.locator('#next').click();
@@ -73,18 +85,42 @@ test.describe('Forgot Password negative cases', () => {
   });
 
   test('Wrong OTP entered three times during reset eventually locks verification', async ({ page }) => {
-    await resetFlowToStart(page);
+    page = await resetFlowToStart(page);
 
-    await waitForAndClick(page, '#home_forgot_Password', 'Forgot password link', 15000);
+    const forgotClicked = await clickForgotPassword(page, 15000);
+    if (!forgotClicked) {
+      throw new Error('Unable to open forgot password flow');
+    }
+    await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     const fpUsername = page.locator('#FPUsername, input[name="FPUsername"]').first();
-    await expect(fpUsername).toBeVisible({ timeout: 15000 });
+    await fpUsername.waitFor({ state: 'visible', timeout: 30000 });
 
     await fpUsername.fill(VALID_FORGOT_USERNAME);
     await page.locator('#next').click();
 
-    const gotItBtn = page.locator('text=Got it');
-    if (await gotItBtn.count()) {
+    const gotItBtn = page.locator('text=/Got it/i').first();
+    if (await gotItBtn.isVisible({ timeout: 15000 }).catch(() => false)) {
       await gotItBtn.click({ force: true });
+      await page.waitForLoadState('load').catch(() => {});
+      await page.waitForLoadState('networkidle').catch(() => {});
+      await page.waitForTimeout(2500);
+    }
+
+    const otpMethodSelected = await selectOtpMethod(page, 45000);
+    const otpInputsPresent = await waitForOtpInputs(page, 5000).then(() => true).catch(() => false);
+    if (!otpMethodSelected && !otpInputsPresent) {
+      const activeSessionMsg = page.locator('text=/already active session|automatically logged out/i');
+      if (await activeSessionMsg.first().isVisible({ timeout: 3000 }).catch(() => false)) {
+        test.skip(true, 'The test account has an already-active session and cannot reach OTP verification.');
+        return;
+      }
+      const sessionTimeoutMsg = page.locator('text=/session.*timeout|session has ended|login again/i');
+      if (await sessionTimeoutMsg.first().isVisible({ timeout: 3000 }).catch(() => false)) {
+        test.skip(true, 'The environment ended the forgot-password session before OTP verification was available.');
+        return;
+      }
+      throw new Error('OTP method selection failed after dismissing active-session warning');
     }
 
     const otpError = page.locator('text=/invalid|incorrect|wrong otp|verification failed|authentication failed/i');

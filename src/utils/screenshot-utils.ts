@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { Page } from '@playwright/test';
 
-const SCREENSHOT_BASE_DIR = path.join(process.cwd(), 'test-artifacts', 'screenshots');
+const SCREENSHOT_BASE_DIR = path.join(process.cwd(), 'artifacts', 'test-artifacts', 'screenshots');
 const RUN_DIR_NAME = `run-${new Date().toISOString().replace(/[:.]/g, '-')}`;
 const SCREENSHOT_DIR = path.join(SCREENSHOT_BASE_DIR, RUN_DIR_NAME);
 

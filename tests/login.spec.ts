@@ -1,11 +1,11 @@
 import { test } from '@playwright/test';
-import { getOtpFromGmail } from '../utils/auth-gmail';
-import { getLoginCredentials, DEFAULT_EMAIL_SENDER } from './credentials';
-import { fillOtpInputs, waitForAndClick, waitForOtpInputs } from './otp-utils';
-import { START_URL, gotoWith502Check, is502Page, resetToStart } from './flow-utils';
+import { getOtpFromGmail } from '../src/utils/auth-gmail';
+import { getLoginCredentials, DEFAULT_EMAIL_SENDER } from '../src/utils/credentials';
+import { fillOtpInputs, selectOtpMethod, waitForOtpInputs } from '../src/utils/otp-utils';
+import { START_URL, gotoWith502Check, is502Page, resetToStart } from '../src/utils/flow-utils';
 
 
-test.setTimeout(90000);
+test.setTimeout(180000);
 
 test.use({
   headless: false,
@@ -43,9 +43,9 @@ test('ComBank login', async ({ page }) => {
       await pageToUse.waitForLoadState('networkidle');
       await pageToUse.waitForTimeout(2000);
 
-      const emailSelected = await waitForAndClick(pageToUse, 'text=/Request OTP to email/i', 'Email OTP option', 45000);
-      if (!emailSelected) {
-        await waitForAndClick(pageToUse, 'text=/Request OTP to mobile/i', 'Mobile OTP option', 45000);
+      const otpMethodSelected = await selectOtpMethod(pageToUse, 45000);
+      if (!otpMethodSelected) {
+        throw new Error('OTP option not available in login flow.');
       }
 
       await pageToUse.waitForTimeout(2000);

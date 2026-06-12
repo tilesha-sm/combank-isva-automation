@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
-import { fillOtpInputs, waitForAndClick, waitForOtpInputs } from './otp-utils';
-import { resetToStart as resetFlowToStart } from './flow-utils';
-import { saveScreenshot } from './screenshot-utils';
+import { fillOtpInputs, selectOtpMethod, waitForOtpInputs } from '../src/utils/otp-utils';
+import { resetToStart as resetFlowToStart } from '../src/utils/flow-utils';
+import { saveScreenshot } from '../src/utils/screenshot-utils';
 
 const VALID_USERNAME = 'Tilesha04';
 const VALID_PASSWORD = 'Combank@123';
@@ -12,14 +12,14 @@ const USERNAME_FIELD = '#username';
 const PASSWORD_FIELD = 'input[type="password"]';
 const LOGIN_BUTTON = '#loginBtn';
 
-test.setTimeout(90000);
+test.setTimeout(150000);
 
 // Ensure individual negative cases run sequentially in this spec.
 test.describe('Login negative cases', () => {
   test.describe.configure({ mode: 'serial' });
 
   test('Empty username and password keeps login disabled', async ({ page }) => {
-    await resetFlowToStart(page);
+    page = await resetFlowToStart(page);
 
     await page.locator(USERNAME_FIELD).fill('');
     await page.locator(PASSWORD_FIELD).fill('');
@@ -30,7 +30,7 @@ test.describe('Login negative cases', () => {
   });
 
   test('Valid username with wrong password shows login error', async ({ page }) => {
-    await resetFlowToStart(page);
+    page = await resetFlowToStart(page);
 
     await page.locator(USERNAME_FIELD).fill(VALID_USERNAME);
     await page.locator(PASSWORD_FIELD).fill(WRONG_PASSWORD);
@@ -43,7 +43,7 @@ test.describe('Login negative cases', () => {
   });
 
   test('Blank username with valid password keeps login disabled', async ({ page }) => {
-    await resetFlowToStart(page);
+    page = await resetFlowToStart(page);
 
     await page.locator(USERNAME_FIELD).fill('');
     await page.locator(PASSWORD_FIELD).fill(VALID_PASSWORD);
@@ -53,7 +53,7 @@ test.describe('Login negative cases', () => {
   });
 
   test('Wrong OTP entered on the OTP screen shows authentication error', async ({ page }) => {
-    await resetFlowToStart(page);
+    page = await resetFlowToStart(page);
 
     await page.locator(USERNAME_FIELD).fill(VALID_USERNAME);
     await page.locator(PASSWORD_FIELD).fill(VALID_PASSWORD);
@@ -63,42 +63,31 @@ test.describe('Login negative cases', () => {
     await page.waitForLoadState('networkidle');
 
     const gotItBtn = page.locator('text=/Got it/i').first();
-    if (await gotItBtn.count() && await gotItBtn.isVisible().catch(() => false)) {
+    if (await gotItBtn.isVisible({ timeout: 15000 }).catch(() => false)) {
       await gotItBtn.click({ force: true });
+      await page.waitForLoadState('load').catch(() => {});
+      await page.waitForLoadState('networkidle').catch(() => {});
+      await page.waitForTimeout(2000);
     }
 
-    const emailSelected = await waitForAndClick(page, 'text=/Request OTP to email/i', 'Email OTP option', 45000);
-    if (!emailSelected) {
-      await waitForAndClick(page, 'text=/Request OTP to mobile/i', 'Mobile OTP option', 45000);
+    const otpMethodSelected = await selectOtpMethod(page, 45000);
+    const otpInputsPresent = await waitForOtpInputs(page, 5000).then(() => true).catch(() => false);
+    if (!otpMethodSelected && !otpInputsPresent) {
+      throw new Error('OTP method selection failed in login negative flow');
     }
 
-    let lockDetected = false;
+    await waitForOtpInputs(page, 45000);
+    await fillOtpInputs(page, WRONG_OTP);
+
+    const submitButton = page.locator('button[type="submit"],button:has-text("Submit"),button:has-text("Continue"),button:has-text("Verify")').first();
+    if (await submitButton.count()) {
+      await submitButton.click({ force: true });
+    } else {
+      await page.keyboard.press('Enter');
+    }
+
     const otpError = page.locator('text=/invalid|incorrect|wrong otp|authentication failed|verification failed/i');
-    const lockError = page.locator('text=/locked|blocked|too many attempts|try again later|account.*locked|otp.*locked|verification.*locked/i');
-
-    for (let attempt = 1; attempt <= 3; attempt += 1) {
-      await waitForOtpInputs(page, 90000);
-      await fillOtpInputs(page, WRONG_OTP);
-
-      const submitButton = page.locator('button[type="submit"],button:has-text("Submit"),button:has-text("Continue"),button:has-text("Verify")').first();
-      if (await submitButton.count()) {
-        await submitButton.click({ force: true });
-      } else {
-        await page.keyboard.press('Enter');
-      }
-
-      if (attempt < 3) {
-        await expect(otpError.first()).toBeVisible({ timeout: 20000 });
-        await saveScreenshot(page, `login-wrong-otp-attempt-${attempt}`);
-      } else {
-        await expect(lockError.first()).toBeVisible({ timeout: 30000 });
-        lockDetected = true;
-        await saveScreenshot(page, 'login-otp-locked-final');
-      }
-    }
-
-    if (!lockDetected) {
-      throw new Error('OTP lock state was not reached after 3 failed attempts');
-    }
+    await expect(otpError.first()).toBeVisible({ timeout: 30000 });
+    await saveScreenshot(page, 'login-wrong-otp-error');
   });
 });

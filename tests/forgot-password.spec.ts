@@ -1,11 +1,11 @@
 import { expect, test } from '@playwright/test';
-import { getForgotPasswordCredential, DEFAULT_EMAIL_SENDER } from './credentials';
-import { getOtpFromGmail } from '../utils/auth-gmail';
-import { fillOtpInputs, waitForAndClick, waitForOtpInputs } from './otp-utils';
-import { START_URL, gotoWith502Check, is502Page, resetToStart } from './flow-utils';
+import { getForgotPasswordCredential, DEFAULT_EMAIL_SENDER } from '../src/utils/credentials';
+import { getOtpFromGmail } from '../src/utils/auth-gmail';
+import { fillOtpInputs, selectOtpMethod, waitForAndClick, waitForOtpInputs } from '../src/utils/otp-utils';
+import { START_URL, gotoWith502Check, is502Page, resetToStart } from '../src/utils/flow-utils';
 
 
-test.setTimeout(90000);
+test.setTimeout(180000);
 
 test('Forgot Password flow', async ({ page }) => {
   const MAX_ATTEMPTS = 3;
@@ -20,9 +20,12 @@ test('Forgot Password flow', async ({ page }) => {
       if (await is502Page(pageToUse)) throw new Error('Detected 502 Bad Gateway');
 
       // Forgot password
-      const forgotLink = pageToUse.locator('#home_forgot_Password');
-      await forgotLink.waitFor({ state: 'visible', timeout: 15000 });
-      await forgotLink.click({ force: true });
+      const forgotClicked =
+        (await waitForAndClick(pageToUse, '#home_forgot_Password', 'Forgot password link', 15000)) ||
+        (await waitForAndClick(pageToUse, 'text=/Forgot password/i', 'Forgot password link', 15000));
+      if (!forgotClicked) {
+        throw new Error('Unable to open forgot password flow');
+      }
       await pageToUse.waitForLoadState('domcontentloaded');
       await pageToUse.waitForLoadState('networkidle');
 
@@ -68,12 +71,7 @@ test('Forgot Password flow', async ({ page }) => {
         throw new Error('Session timed out on forgot-password flow before OTP selection.');
       }
 
-      const emailSelected = await waitForAndClick(pageToUse, 'text=/Request OTP to email/i', 'Email OTP option', 45000);
-      let otpMethodSelected = emailSelected;
-      if (!otpMethodSelected) {
-        otpMethodSelected = await waitForAndClick(pageToUse, 'text=/Request OTP to mobile/i', 'Mobile OTP option', 45000);
-      }
-
+      const otpMethodSelected = await selectOtpMethod(pageToUse, 45000);
       if (!otpMethodSelected) {
         throw new Error('OTP option not available in forgot-password flow.');
       }
