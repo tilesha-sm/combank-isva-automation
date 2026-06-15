@@ -82,21 +82,40 @@ export async function selectOtpMethod(page: Page, timeoutMs = 45000) {
 }
 
 async function findVisibleOtpInputs(page: Page) {
-    const strongSelectors = [
+  const strongSelectors = [
     '#otp1,#otp2,#otp3,#otp4,#otp5,#otp6',
     'input[autocomplete="one-time-code"],input[id*="otp"],input[name*="otp"],input[placeholder*="OTP"],input[aria-label*="OTP"],input[aria-label*="One-time Password"],input[aria-label*="verification code"],input[aria-label*="Verification code"]',
     'input[maxlength="1"][type="tel"],input[maxlength="1"][inputmode="numeric"],input[maxlength="1"][pattern="\\d*"]',
   ];
   const genericSelectors = ['input[type="tel"],input[type="text"]'];
   const loginFieldPattern = /user(name)?|email|pass(word)?|login|search|name/i;
+  const otpFieldPattern = /otp|one[-\s]?time|verification|security\s?code|passcode/i;
+  const otpScreenPattern = /otp|one[-\s]?time|verification\s?code|security\s?code|passcode|request otp|enter.*code/i;
 
   async function isLikelyOtpInput(locator: any) {
     const id = (await locator.getAttribute('id')) || '';
     const name = (await locator.getAttribute('name')) || '';
     const placeholder = (await locator.getAttribute('placeholder')) || '';
     const ariaLabel = (await locator.getAttribute('aria-label')) || '';
-    const value = `${id} ${name} ${placeholder} ${ariaLabel}`;
-    return !loginFieldPattern.test(value);
+    const autocomplete = (await locator.getAttribute('autocomplete')) || '';
+    const inputMode = (await locator.getAttribute('inputmode')) || '';
+    const maxLength = (await locator.getAttribute('maxlength')) || '';
+    const value = `${id} ${name} ${placeholder} ${ariaLabel} ${autocomplete}`;
+
+    if (loginFieldPattern.test(value)) return false;
+    if (otpFieldPattern.test(value)) return true;
+    if (autocomplete === 'one-time-code') return true;
+    if (/numeric|decimal/i.test(inputMode) && /^[1-8]$/.test(maxLength)) return true;
+
+    return false;
+  }
+
+  async function pageHasOtpContext() {
+    return page
+      .locator(`text=${otpScreenPattern}`)
+      .first()
+      .isVisible({ timeout: 500 })
+      .catch(() => false);
   }
 
   const frames = page.frames();
@@ -121,23 +140,25 @@ async function findVisibleOtpInputs(page: Page) {
     }
   }
 
-  for (const selector of genericSelectors) {
-    for (const frame of frames) {
-      const locator = frame.locator(selector as any);
-      const count = await locator.count();
-      if (count === 0) continue;
+  if (await pageHasOtpContext()) {
+    for (const selector of genericSelectors) {
+      for (const frame of frames) {
+        const locator = frame.locator(selector as any);
+        const count = await locator.count();
+        if (count === 0) continue;
 
-      const visibleLocators = [] as any[];
-      for (let i = 0; i < count; i++) {
-        const candidate = locator.nth(i);
-        const isVisible = await candidate.isVisible().catch(() => false);
-        if (!isVisible) continue;
-        if (!(await isLikelyOtpInput(candidate))) continue;
-        visibleLocators.push(candidate);
-      }
+        const visibleLocators = [] as any[];
+        for (let i = 0; i < count; i++) {
+          const candidate = locator.nth(i);
+          const isVisible = await candidate.isVisible().catch(() => false);
+          if (!isVisible) continue;
+          if (!(await isLikelyOtpInput(candidate))) continue;
+          visibleLocators.push(candidate);
+        }
 
-      if (visibleLocators.length > 0) {
-        return visibleLocators;
+        if (visibleLocators.length > 0) {
+          return visibleLocators;
+        }
       }
     }
   }
@@ -197,6 +218,25 @@ export async function fillOtpInputs(page: Page, otp: string) {
       await ordered[0].fill(otp);
     }
     return;
+  }
+
+  try {
+    await ordered[0].waitFor({ state: 'visible', timeout: 30000 });
+    await ordered[0].click({ force: true });
+    await page.keyboard.type(otp, { delay: 75 });
+    await page.waitForTimeout(500);
+
+    let filledCount = 0;
+    for (const input of ordered.slice(0, digits.length)) {
+      const value = await input.inputValue().catch(() => '');
+      if (value) filledCount += 1;
+    }
+
+    if (filledCount >= Math.min(ordered.length, digits.length)) {
+      return;
+    }
+  } catch {
+    // Fall back to explicit digit-by-digit filling below.
   }
 
   // Multiple inputs - type digit-by-digit. Some pages keep only the active box
