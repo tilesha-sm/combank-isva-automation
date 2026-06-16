@@ -42,15 +42,16 @@ export async function selectOtpMethod(page: Page, timeoutMs = 45000) {
 
   const deadline = Date.now() + timeoutMs;
 
+  // Primary selector targeting email OTP button by role
+  const emailButton = page.getByRole('button', { name: /request otp to email|email.*otp|otp.*email/i }).first();
+
+  // Additional fallback candidates
   const candidates = [
+    emailButton,
     page.getByRole('button', { name: /request otp to email/i }).first(),
-    page.getByRole('button', { name: /request otp to mobile/i }).first(),
     page.getByRole('button', { name: /email/i }).first(),
-    page.getByRole('button', { name: /sms|mobile/i }).first(),
-    page.locator('button#email').first(),
-    page.locator('button#sms').first(),
     page.locator('button:has-text("Request OTP to email")').first(),
-    page.locator('button:has-text("Request OTP to mobile")').first(),
+    page.locator('button').filter({ hasText: /request otp to email/i }).first(),
   ];
 
   for (const locator of candidates) {
@@ -60,14 +61,24 @@ export async function selectOtpMethod(page: Page, timeoutMs = 45000) {
     try {
       const visible = await locator.isVisible({ timeout: Math.min(3000, remainingMs) }).catch(() => false);
       if (visible) {
+        // Ensure button is enabled and stable
+        try {
+          await locator.isEnabled({ timeout: 2000 });
+        } catch {
+          continue;
+        }
+
         await locator.click({ force: true, timeout: 5000 });
+        
+        // Wait for page transition
+        await page.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => {});
         await page.waitForLoadState('load').catch(() => {});
-        await page.waitForLoadState('networkidle').catch(() => {});
-        await page.waitForTimeout(1500);
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await page.waitForTimeout(2000);
 
         // Check if OTP inputs appeared
         try {
-          const inputs = await waitForOtpInputs(page, 8000);
+          const inputs = await waitForOtpInputs(page, 10000);
           if (inputs.length > 0) return true;
         } catch {
           // continue to next selector
@@ -220,27 +231,10 @@ export async function fillOtpInputs(page: Page, otp: string) {
     return;
   }
 
-  try {
-    await ordered[0].waitFor({ state: 'visible', timeout: 30000 });
-    await ordered[0].click({ force: true });
-    await page.keyboard.type(otp, { delay: 75 });
-    await page.waitForTimeout(500);
-
-    let filledCount = 0;
-    for (const input of ordered.slice(0, digits.length)) {
-      const value = await input.inputValue().catch(() => '');
-      if (value) filledCount += 1;
-    }
-
-    if (filledCount >= Math.min(ordered.length, digits.length)) {
-      return;
-    }
-  } catch {
-    // Fall back to explicit digit-by-digit filling below.
-  }
-
-  // Multiple inputs - type digit-by-digit. Some pages keep only the active box
-  // enabled and unlock the next box from oninput/onkeyup handlers.
+  // Multiple OTP inputs - fill them digit-by-digit. This avoids entering the whole
+  // code into the first box and then re-filling the remaining fields.
+  // Some pages keep only the active box enabled and unlock the next box from
+  // oninput/onkeyup handlers.
   const requiredFills = Math.min(ordered.length, digits.length);
 
   for (let i = 0; i < requiredFills; i++) {
