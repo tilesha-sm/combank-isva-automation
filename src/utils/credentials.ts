@@ -7,6 +7,18 @@ export type ForgotPasswordCredential = {
   username: string;
 };
 
+export type ForcePasswordCredential = {
+  username: string;
+  password: string;
+  newPassword: string;
+};
+
+export type ForceUsernameCredential = {
+  username: string;
+  password: string;
+  newUsername: string;
+};
+
 export const LOGIN_CREDENTIALS: LoginCredential[] = [
   { username: 'Tilesha04', password: 'Combank@123' },
   
@@ -16,6 +28,18 @@ export const FORGOT_PASSWORD_CREDENTIALS: ForgotPasswordCredential[] = [
   { username: 'pasanqa1' },
   
 ];
+
+export const FORCE_PASSWORD_CREDENTIALS: ForcePasswordCredential = {
+  username: 'Tilesha01',
+  password: 'Combank@123',
+  newPassword: 'Combank@456',
+};
+
+export const FORCE_USERNAME_CREDENTIALS: ForceUsernameCredential = {
+  username: 'Tilesha01',
+  password: 'Combank@123',
+  newUsername: 'tilesha01new',
+};
 
 function chooseRandom<T>(items: T[]): T {
   return items[Math.floor(Math.random() * items.length)];

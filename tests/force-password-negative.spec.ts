@@ -1,0 +1,123 @@
+import { expect, Page, test } from '@playwright/test';
+import { getOtpFromGmail } from '../src/utils/auth-gmail';
+import { FORCE_PASSWORD_CREDENTIALS, DEFAULT_EMAIL_SENDER } from '../src/utils/credentials';
+import { fillOtpInputs, selectOtpMethod, waitForOtpInputs } from '../src/utils/otp-utils';
+import { resetToStart } from '../src/utils/flow-utils';
+import { saveScreenshot } from '../src/utils/screenshot-utils';
+
+test.setTimeout(150000);
+
+test.describe.configure({ mode: 'serial' });
+
+test.describe('Force password negative cases', () => {
+  async function reachChangePasswordScreen(page: Page) {
+    page = await resetToStart(page);
+
+    await page.locator('#username').fill(FORCE_PASSWORD_CREDENTIALS.username);
+    await page.locator('input[type="password"]').fill(FORCE_PASSWORD_CREDENTIALS.password);
+    await page.locator('#loginBtn').click();
+    await page.waitForLoadState('load');
+    await page.waitForLoadState('networkidle');
+
+    const gotItBtn = page.locator('text=/Got it/i').first();
+    if (await gotItBtn.isVisible({ timeout: 15000 }).catch(() => false)) {
+      await gotItBtn.click({ force: true });
+      await page.waitForLoadState('load').catch(() => {});
+      await page.waitForLoadState('networkidle').catch(() => {});
+    }
+
+    await page.waitForTimeout(2000);
+    const otpMethodSelected = await selectOtpMethod(page, 45000);
+    if (!otpMethodSelected) {
+      throw new Error('OTP option not available in force-password-negative flow.');
+    }
+
+    await page.waitForTimeout(2000);
+    await waitForOtpInputs(page, 90000);
+
+    const otp = await getOtpFromGmail(DEFAULT_EMAIL_SENDER, null, 10, 30000);
+    if (!otp) {
+      throw new Error('OTP not found in Gmail');
+    }
+    await fillOtpInputs(page, otp);
+    await page.waitForTimeout(2000);
+
+    const currentPasswordInput = page.locator('#currentPassword, input[name="currentPassword"], input[type="password"]:nth-of-type(1)').first();
+    await expect(currentPasswordInput).toBeVisible({ timeout: 30000 });
+    return page;
+  }
+
+  test('Passwords do not match keeps submit disabled', async ({ page }) => {
+    await reachChangePasswordScreen(page);
+
+    const currentPasswordInput = page.locator('#currentPassword, input[name="currentPassword"], input[type="password"]:nth-of-type(1)').first();
+    const newPasswordInput = page.locator('#newPassword, input[name="newPassword"], input[type="password"]:nth-of-type(2)').first();
+    const confirmPasswordInput = page.locator('#confirmPassword, input[name="confirmPassword"], input[type="password"]:nth-of-type(3)').first();
+    const submitButton = page.locator('button[type="submit"], #submitBtn, button:has-text("Submit")').first();
+
+    await currentPasswordInput.fill(FORCE_PASSWORD_CREDENTIALS.password);
+    await newPasswordInput.fill('NewPass@123');
+    await confirmPasswordInput.fill('DifferentPass@123');
+
+    const errorMessage = page.locator('text=/passwords do not match|please re-enter/i');
+    await expect(errorMessage.first()).toBeVisible({ timeout: 15000 });
+    await expect(submitButton).toBeDisabled();
+  });
+
+  test('New password fails policy rules', async ({ page }) => {
+    await reachChangePasswordScreen(page);
+
+    const currentPasswordInput = page.locator('#currentPassword, input[name="currentPassword"], input[type="password"]:nth-of-type(1)').first();
+    const newPasswordInput = page.locator('#newPassword, input[name="newPassword"], input[type="password"]:nth-of-type(2)').first();
+    const submitButton = page.locator('button[type="submit"], #submitBtn, button:has-text("Submit")').first();
+
+    await currentPasswordInput.fill(FORCE_PASSWORD_CREDENTIALS.password);
+    await newPasswordInput.fill('abc');
+
+    const policyChecklist = page.locator('text=/must contain|at least|characters/i');
+    await expect(policyChecklist.first()).toBeVisible({ timeout: 15000 });
+    await expect(submitButton).toBeDisabled();
+  });
+
+  test('Previously used password rejected', async ({ page }) => {
+    await reachChangePasswordScreen(page);
+
+    const currentPasswordInput = page.locator('#currentPassword, input[name="currentPassword"], input[type="password"]:nth-of-type(1)').first();
+    const newPasswordInput = page.locator('#newPassword, input[name="newPassword"], input[type="password"]:nth-of-type(2)').first();
+    const confirmPasswordInput = page.locator('#confirmPassword, input[name="confirmPassword"], input[type="password"]:nth-of-type(3)').first();
+    const submitButton = page.locator('button[type="submit"], #submitBtn, button:has-text("Submit")').first();
+
+    await currentPasswordInput.fill(FORCE_PASSWORD_CREDENTIALS.password);
+    await newPasswordInput.fill(FORCE_PASSWORD_CREDENTIALS.password);
+    await confirmPasswordInput.fill(FORCE_PASSWORD_CREDENTIALS.password);
+    await submitButton.click();
+
+    const reusedError = page.locator('text=/previously used|cannot be reused|create a new password/i');
+    await expect(reusedError.first()).toBeVisible({ timeout: 15000 });
+    await expect(currentPasswordInput).toHaveValue('');
+    await expect(newPasswordInput).toHaveValue('');
+    await expect(confirmPasswordInput).toHaveValue('');
+    await expect(submitButton).toBeDisabled();
+  });
+
+  test('Wrong current password shows error', async ({ page }) => {
+    await reachChangePasswordScreen(page);
+
+    const currentPasswordInput = page.locator('#currentPassword, input[name="currentPassword"], input[type="password"]:nth-of-type(1)').first();
+    const newPasswordInput = page.locator('#newPassword, input[name="newPassword"], input[type="password"]:nth-of-type(2)').first();
+    const confirmPasswordInput = page.locator('#confirmPassword, input[name="confirmPassword"], input[type="password"]:nth-of-type(3)').first();
+    const submitButton = page.locator('button[type="submit"], #submitBtn, button:has-text("Submit")').first();
+
+    await currentPasswordInput.fill('WrongPass@999');
+    await newPasswordInput.fill(FORCE_PASSWORD_CREDENTIALS.newPassword);
+    await confirmPasswordInput.fill(FORCE_PASSWORD_CREDENTIALS.newPassword);
+    await submitButton.click();
+
+    const wrongCurrentError = page.locator('text=/incorrect current password/i');
+    await expect(wrongCurrentError.first()).toBeVisible({ timeout: 15000 });
+    await expect(currentPasswordInput).toHaveValue('');
+    await expect(newPasswordInput).toHaveValue('');
+    await expect(confirmPasswordInput).toHaveValue('');
+    await expect(submitButton).toBeDisabled();
+  });
+});

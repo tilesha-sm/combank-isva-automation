@@ -1,6 +1,6 @@
 import { Page } from '@playwright/test';
 
-export const START_URL = 'https://uatisvaext.combank.net/sso.html';
+export const START_URL = 'https://uatisvaext.combank.net/mga/sps/oauth/oauth20/authorize?response_type=code&client_id=iCashProGUISSO&redirect_uri=https%3A%2F%2Ftest.com%2Fcallback&scope=openid&state=76677667';
 
 const CLOSED_PAGE_REGEX = /closed/i;
 

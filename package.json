@@ -4,9 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test:sequence": "playwright test tests/login.spec.ts --project=Chrome --workers=1 && playwright test tests/forgot-password.spec.ts --project=Chrome --workers=1",
+    "test:sequence": "npx playwright test tests/login.spec.ts --project=Chrome --workers=1 && npx playwright test tests/login-negative.spec.ts --project=Chrome --workers=1 && npx playwright test tests/forgot-password.spec.ts --project=Chrome --workers=1 && npx playwright test tests/forgot-password-negative.spec.ts --project=Chrome --workers=1",
     "test:no-deprecation": "set NODE_OPTIONS=--no-deprecation&& npx playwright test --project=Chrome --workers=1",
-    "test:sequence:no-deprecation": "set NODE_OPTIONS=--no-deprecation&& npx playwright test tests/login.spec.ts --project=Chrome --workers=1 && set NODE_OPTIONS=--no-deprecation&& npx playwright test tests/forgot-password.spec.ts --project=Chrome --workers=1",
+    "test:sequence:no-deprecation": "set NODE_OPTIONS=--no-deprecation&& npx playwright test tests/login.spec.ts --project=Chrome --workers=1 && set NODE_OPTIONS=--no-deprecation&& npx playwright test tests/login-negative.spec.ts --project=Chrome --workers=1 && set NODE_OPTIONS=--no-deprecation&& npx playwright test tests/forgot-password.spec.ts --project=Chrome --workers=1 && set NODE_OPTIONS=--no-deprecation&& npx playwright test tests/forgot-password-negative.spec.ts --project=Chrome --workers=1",
+    "test:all:no-deprecation": "set NODE_OPTIONS=--no-deprecation&& npx playwright test tests/login.spec.ts --project=Chrome --workers=1 && set NODE_OPTIONS=--no-deprecation&& npx playwright test tests/login-negative.spec.ts --project=Chrome --workers=1 && set NODE_OPTIONS=--no-deprecation&& npx playwright test tests/forgot-password.spec.ts --project=Chrome --workers=1 && set NODE_OPTIONS=--no-deprecation&& npx playwright test tests/forgot-password-negative.spec.ts --project=Chrome --workers=1",
     "test:html": "set NODE_OPTIONS=--no-deprecation&& npx playwright test --reporter=html",
     "test:report": "set NODE_OPTIONS=--no-deprecation&& npx playwright test --reporter=html && npx playwright show-report artifacts\\playwright-report"
   },

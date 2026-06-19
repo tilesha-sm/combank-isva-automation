@@ -2,13 +2,10 @@ import fs from 'fs';
 import path from 'path';
 import { Page } from '@playwright/test';
 
-const SCREENSHOT_BASE_DIR = path.join(process.cwd(), 'artifacts', 'test-artifacts', 'screenshots');
-const RUN_DIR_NAME = `run-${new Date().toISOString().replace(/[:.]/g, '-')}`;
-const SCREENSHOT_DIR = path.join(SCREENSHOT_BASE_DIR, RUN_DIR_NAME);
-
-fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
-
-let screenshotCounter = 0;
+const SCREENSHOT_BASE_DIR = path.join(process.cwd(), 'artifacts', 'screenshots');
+let RUN_DIR_NAME = '';
+let SCREENSHOT_DIR = '';
+let isInitialized = false;
 
 function sanitizeFilename(name: string) {
   return name
@@ -18,12 +15,73 @@ function sanitizeFilename(name: string) {
     .replace(/-+/g, '-');
 }
 
-export async function saveScreenshot(page: Page, name: string) {
+function calculateNextRunNumber(): string {
   try {
-    screenshotCounter++;
-    const paddedCount = String(screenshotCounter).padStart(3, '0');
+    if (!fs.existsSync(SCREENSHOT_BASE_DIR)) {
+      fs.mkdirSync(SCREENSHOT_BASE_DIR, { recursive: true });
+    }
+    const entries = fs.readdirSync(SCREENSHOT_BASE_DIR, { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .map((d) => d.name);
+    const runRegex = /^run-(\d{3})$/;
+    let max = 0;
+    for (const name of entries) {
+      const m = name.match(runRegex);
+      if (m) {
+        const n = parseInt(m[1], 10);
+        if (!Number.isNaN(n) && n > max) max = n;
+      }
+    }
+    const next = String(max + 1).padStart(3, '0');
+    return `run-${next}`;
+  } catch (e) {
+    return 'run-001';
+  }
+}
+
+function ensureRunDir(browserName = (process.env.BROWSER_NAME || 'chromium'), testType = 'login') {
+  if (!isInitialized) {
+    // Lazy init: calculate run number fresh on first screenshot
+    RUN_DIR_NAME = calculateNextRunNumber();
+    SCREENSHOT_DIR = path.join(SCREENSHOT_BASE_DIR, RUN_DIR_NAME);
+    fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
+    isInitialized = true;
+  }
+
+  const browser = (String(browserName || 'chromium')).toLowerCase().replace(/\s+/g, '-');
+  const typeDir = String(testType || 'login');
+  const fullDir = path.join(SCREENSHOT_DIR, browser, typeDir);
+  fs.mkdirSync(fullDir, { recursive: true });
+  return fullDir;
+}
+
+export async function saveScreenshot(page: Page, name: string, testType: 'login' | 'forgot-password' | 'login-negative' | 'forgot-password-negative' = 'login') {
+  try {
+    const browserName = (process.env.BROWSER_NAME || 'chromium').toLowerCase().replace(/\s+/g, '-');
+    const dir = ensureRunDir(browserName, testType);
+
+    // Determine next 3-digit prefix based on existing files in dir
+    let counter = 1;
+    try {
+      const files = fs.readdirSync(dir).filter((f) => /^\d{3}-.+\.png$/.test(f));
+      if (files.length > 0) {
+        let max = 0;
+        for (const f of files) {
+          const m = f.match(/^(\d{3})-/);
+          if (m) {
+            const n = parseInt(m[1], 10);
+            if (!Number.isNaN(n) && n > max) max = n;
+          }
+        }
+        counter = max + 1;
+      }
+    } catch (e) {
+      counter = 1;
+    }
+
+    const paddedCount = String(counter).padStart(3, '0');
     const fileName = `${paddedCount}-${sanitizeFilename(name).replace(/\.png$/i, '')}.png`;
-    const filePath = path.join(SCREENSHOT_DIR, fileName);
+    const filePath = path.join(dir, fileName);
     await page.screenshot({ path: filePath, fullPage: true });
     return filePath;
   } catch (error) {
@@ -36,37 +94,28 @@ export async function setupAutoScreenshots(page: Page) {
 
   // Capture screenshot on page navigation
   page.on('framenavigated', async () => {
-    await saveScreenshot(page, `page-navigation-${++actionCounter}`);
+    // Auto-screenshots disabled; use explicit saveScreenshot calls with testType parameter
   });
 
   // Capture screenshot on dialog/popup
   page.on('dialog', async () => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    await saveScreenshot(page, `dialog-appeared-${++actionCounter}`);
+    // Auto-screenshots disabled; use explicit saveScreenshot calls with testType parameter
   });
 
-  // Intercept click actions
-  const originalClick = page.locator.bind(page);
-  page.locator = function(selector: string) {
-    const locator = originalClick(selector);
-    const originalLocatorClick = locator.click.bind(locator);
-    
-    locator.click = async function(options?: any) {
-      await saveScreenshot(page, `before-click-${++actionCounter}`);
-      await originalLocatorClick(options);
-      await new Promise(resolve => setTimeout(resolve, 500));
-      await saveScreenshot(page, `after-click-${++actionCounter}`);
-      return;
-    };
-    
+  // Intercept click actions (best-effort; keep lightweight)
+  const originalLocator = page.locator.bind(page);
+  // Keep the original behavior; do not aggressively snapshot clicks in tests by default.
+  page.locator = function (selector: string) {
+    const locator = originalLocator(selector);
+    // Auto-click screenshots disabled; use explicit saveScreenshot calls instead
     return locator;
   };
 }
 
-export async function captureScreenAtStep(page: Page, stepName: string) {
-  await new Promise(resolve => setTimeout(resolve, 300));
-  await saveScreenshot(page, `step-${stepName}`);
+export function getScreenshotBaseDir() {
+  return SCREENSHOT_BASE_DIR;
 }
 
-export const SCREENSHOT_DIR_PATH = SCREENSHOT_DIR;
-export const SCREENSHOT_RUN_DIR_NAME = RUN_DIR_NAME;
+export function getScreenshotRunDirName() {
+  return RUN_DIR_NAME;
+}

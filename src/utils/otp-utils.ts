@@ -12,6 +12,20 @@ export async function waitForAndClick(page: Page, selector: string, label: strin
   }
 }
 
+async function waitForForgotPasswordForm(page: Page, timeoutMs = 10000) {
+  const selector = '#FPUsername, input[name="FPUsername"]';
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    if (await page.locator(selector).first().isVisible({ timeout: Math.min(1000, deadline - Date.now()) }).catch(() => false)) {
+      return true;
+    }
+    await page.waitForTimeout(250);
+  }
+
+  return false;
+}
+
 export async function clickForgotPassword(page: Page, timeoutMs = 15000) {
   const selectors = [
     '#home_forgot_Password',
@@ -21,9 +35,18 @@ export async function clickForgotPassword(page: Page, timeoutMs = 15000) {
     'text=/Forgot password/i',
   ];
 
+  const deadline = Date.now() + timeoutMs;
+
   for (const selector of selectors) {
-    const clicked = await waitForAndClick(page, selector, `Forgot password link (${selector})`, timeoutMs);
-    if (clicked) {
+    const remaining = Math.max(1000, deadline - Date.now());
+    const clicked = await waitForAndClick(page, selector, `Forgot password link (${selector})`, remaining);
+    if (!clicked) {
+      continue;
+    }
+
+    await page.waitForLoadState('networkidle').catch(() => {});
+    const gotForm = await waitForForgotPasswordForm(page, Math.min(10000, deadline - Date.now()));
+    if (gotForm) {
       return true;
     }
   }
@@ -75,6 +98,16 @@ export async function selectOtpMethod(page: Page, timeoutMs = 45000) {
         await page.waitForLoadState('load').catch(() => {});
         await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await page.waitForTimeout(2000);
+
+        // After clicking an OTP method, wait for the selection buttons/context to disappear
+        try {
+          await page
+            .locator('text=/request otp to email|request otp to mobile|select.*otp method|choose.*otp method/i')
+            .first()
+            .waitFor({ state: 'hidden', timeout: 10000 });
+        } catch {
+          // Not fatal - continue to check for inputs
+        }
 
         // Check if OTP inputs appeared
         try {
@@ -194,7 +227,23 @@ export async function waitForOtpInputs(page: Page, timeoutMs = 90000) {
 export async function fillOtpInputs(page: Page, otp: string) {
   const digits = otp.trim().split('');
   const inputs = await waitForOtpInputs(page, 30000);
-  
+  // Ensure first OTP input is visible and editable — fail fast if we're on wrong screen
+  if (!inputs || inputs.length === 0) {
+    throw new Error('OTP input boxes are not ready — fillOtpInputs called on wrong screen');
+  }
+  const firstInput = inputs[0];
+  try {
+    await firstInput.waitFor({ state: 'visible', timeout: 15000 });
+    const editableDeadline = Date.now() + 15000;
+    while (!(await firstInput.isEditable({ timeout: 1000 }).catch(() => false))) {
+      if (Date.now() >= editableDeadline) {
+        throw new Error('OTP input boxes are not ready — fillOtpInputs called on wrong screen');
+      }
+      await page.waitForTimeout(250);
+    }
+  } catch (e) {
+    throw new Error('OTP input boxes are not ready — fillOtpInputs called on wrong screen');
+  }
   // If multiple inputs, try to sort by numeric id suffix (otp1, otp2, ...)
   let ordered = inputs;
   try {

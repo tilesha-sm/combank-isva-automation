@@ -1,7 +1,7 @@
 import { expect, Page, test } from '@playwright/test';
 import { clickForgotPassword, fillOtpInputs, selectOtpMethod, waitForOtpInputs } from '../src/utils/otp-utils';
 import { resetToStart as resetFlowToStart } from '../src/utils/flow-utils';
-import { setupAutoScreenshots, captureScreenAtStep } from '../src/utils/screenshot-utils';
+import { saveScreenshot } from '../src/utils/screenshot-utils';
 
 const VALID_FORGOT_USERNAME = 'pasanqa1';
 const NON_EXISTENT_USERNAME = 'no.such.user.1234';
@@ -15,10 +15,7 @@ test.describe('Forgot Password negative cases', () => {
   test.describe.configure({ mode: 'serial' });
 
   test('Empty username field shows validation error', async ({ page }) => {
-    await setupAutoScreenshots(page);
-    
     page = await resetFlowToStart(page);
-    await captureScreenAtStep(page, 'login-page-opened');
 
     const forgotClicked = await clickForgotPassword(page, 15000);
     if (!forgotClicked) {
@@ -26,30 +23,23 @@ test.describe('Forgot Password negative cases', () => {
     }
     await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-    await captureScreenAtStep(page, 'forgot-password-page-opened');
+    
     
     const fpUsername = page.locator('#FPUsername, input[name="FPUsername"]').first();
     await fpUsername.waitFor({ state: 'visible', timeout: 30000 });
 
     await fpUsername.fill('');
     await fpUsername.press('Tab');
-    await captureScreenAtStep(page, 'empty-username-field');
-
     await expect(page.locator('#next')).toBeDisabled({ timeout: 15000 });
 
     const validation = page.locator('text=/username.*required|please enter.*username|required/i');
     await expect(validation.first()).toBeVisible({ timeout: 15000 });
-    await captureScreenAtStep(page, 'validation-error-shown');
-
     await expect(fpUsername).toBeVisible();
-    await captureScreenAtStep(page, 'test-passed');
+    await saveScreenshot(page, 'forgot-password_empty-username', 'forgot-password-negative');
   });
 
   test('Non-existent username shows error message', async ({ page }) => {
-    await setupAutoScreenshots(page);
-    
     page = await resetFlowToStart(page);
-    await captureScreenAtStep(page, 'login-page-opened');
 
     const forgotClicked = await clickForgotPassword(page, 15000);
     if (!forgotClicked) {
@@ -57,31 +47,22 @@ test.describe('Forgot Password negative cases', () => {
     }
     await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-    await captureScreenAtStep(page, 'forgot-password-page-opened');
     
     const fpUsername = page.locator('#FPUsername, input[name="FPUsername"]').first();
     await fpUsername.waitFor({ state: 'visible', timeout: 30000 });
 
     await fpUsername.fill(NON_EXISTENT_USERNAME);
     await page.locator('#next').click();
-    await captureScreenAtStep(page, 'nonexistent-username-submitted');
-    
     await page.waitForLoadState('networkidle');
-    await captureScreenAtStep(page, 'page-loaded');
 
     const notFoundError = page.locator('text=/please provide a valid username|not found|does not exist|invalid username|username.*invalid/i');
     await expect(notFoundError.first()).toBeVisible({ timeout: 20000 });
-    await captureScreenAtStep(page, 'error-message-displayed');
-    
     await expect(fpUsername).toBeVisible();
-    await captureScreenAtStep(page, 'test-passed');
+    await saveScreenshot(page, 'forgot-password_nonexistent-user', 'forgot-password-negative');
   });
 
   test('Invalid username format shows validation error', async ({ page }) => {
-    await setupAutoScreenshots(page);
-    
     page = await resetFlowToStart(page);
-    await captureScreenAtStep(page, 'login-page-opened');
 
     const forgotClicked = await clickForgotPassword(page, 15000);
     if (!forgotClicked) {
@@ -89,32 +70,23 @@ test.describe('Forgot Password negative cases', () => {
     }
     await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-    await captureScreenAtStep(page, 'forgot-password-page-opened');
     
     const fpUsername = page.locator('#FPUsername, input[name="FPUsername"]').first();
     await fpUsername.waitFor({ state: 'visible', timeout: 30000 });
 
     await fpUsername.fill(INVALID_FORMAT_USERNAME);
     await page.locator('#next').click();
-    await captureScreenAtStep(page, 'invalid-format-username-submitted');
-    
     await page.waitForLoadState('networkidle');
-    await captureScreenAtStep(page, 'page-loaded');
 
     const invalidFormatError = page.locator('text=/invalid username|special characters|please enter a valid username|please provide a valid username|username.*invalid|format.*username|username.*format/i');
     await expect(invalidFormatError.first()).toBeVisible({ timeout: 20000 });
-    await captureScreenAtStep(page, 'error-message-displayed');
-    
     await expect(page.locator('#next')).toBeDisabled({ timeout: 15000 });
     await expect(fpUsername).toBeVisible();
-    await captureScreenAtStep(page, 'test-passed');
+    await saveScreenshot(page, 'forgot-password_invalid-format', 'forgot-password-negative');
   });
 
   test('Wrong OTP entered three times during reset eventually locks verification', async ({ page }) => {
-    await setupAutoScreenshots(page);
-    
     page = await resetFlowToStart(page);
-    await captureScreenAtStep(page, 'login-page-opened');
 
     const forgotClicked = await clickForgotPassword(page, 15000);
     if (!forgotClicked) {
@@ -122,18 +94,14 @@ test.describe('Forgot Password negative cases', () => {
     }
     await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-    await captureScreenAtStep(page, 'forgot-password-page-opened');
     
     const fpUsername = page.locator('#FPUsername, input[name="FPUsername"]').first();
     await fpUsername.waitFor({ state: 'visible', timeout: 30000 });
 
     await fpUsername.fill(VALID_FORGOT_USERNAME);
     await page.locator('#next').click();
-    await captureScreenAtStep(page, 'valid-username-submitted');
-    
     await page.waitForLoadState('load').catch(() => {});
     await page.waitForLoadState('networkidle').catch(() => {});
-    await captureScreenAtStep(page, 'after-username-load');
 
     const activeSessionMsg = page.locator('text=/already active session|automatically logged out/i');
     const gotItBtn = page.getByRole('link', { name: /Got it/i }).or(page.locator('text=/Got it/i')).first();
@@ -145,7 +113,6 @@ test.describe('Forgot Password negative cases', () => {
       await page.waitForLoadState('load').catch(() => {});
       await page.waitForLoadState('networkidle').catch(() => {});
       await page.waitForTimeout(2500);
-      await captureScreenAtStep(page, 'dialog-dismissed');
     }
 
     if (await activeSessionMsg.first().isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -173,7 +140,6 @@ test.describe('Forgot Password negative cases', () => {
       const timer = page.locator('text=/\d{1,2}s|\d{1,2} seconds|time left|countdown/i');
       if (await timer.first().isVisible({ timeout: 5000 }).catch(() => false)) {
         await page.waitForTimeout(10000);
-        await captureScreenAtStep(page, 'countdown-waited');
       }
     }
 
@@ -189,10 +155,10 @@ test.describe('Forgot Password negative cases', () => {
           await page.waitForLoadState('load', { timeout: 5000 }).catch(() => {});
           await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
           await page.waitForTimeout(2000);
-        } catch (e) {
-          throw new Error(`Failed to click email OTP button: ${e.message}`);
+        } catch (e: unknown) {
+          const message = e instanceof Error ? e.message : String(e);
+          throw new Error(`Failed to click email OTP button: ${message}`);
         }
-        await captureScreenAtStep(page, 'email-button-clicked-directly');
       } else {
         const selected = await selectOtpMethod(page, 45000);
         if (!selected) {
@@ -200,8 +166,6 @@ test.describe('Forgot Password negative cases', () => {
         }
       }
       
-      await captureScreenAtStep(page, 'otp-method-selected');
-
       for (let attempt = 1; attempt <= 3; attempt += 1) {
         try {
           await waitForOtpInputs(page, 20000);
@@ -209,7 +173,6 @@ test.describe('Forgot Password negative cases', () => {
           throw e;
         }
         await fillOtpInputs(page, WRONG_OTP);
-        await captureScreenAtStep(page, `wrong-otp-attempt-${attempt}-entered`);
 
         const submitButton = page.locator('button[type="submit"],button:has-text("Submit"),button:has-text("Continue"),button:has-text("Verify")').first();
         if (await submitButton.count()) {
@@ -217,13 +180,15 @@ test.describe('Forgot Password negative cases', () => {
         } else {
           await page.keyboard.press('Enter');
         }
-        await captureScreenAtStep(page, `wrong-otp-attempt-${attempt}-submitted`);
 
-        const otpErrorVisible = await page.locator('text=/invalid|incorrect|wrong.*(otp|code)|code.*invalid|code.*incorrect|verification failed|authentication failed/i').first().isVisible({ timeout: 20000 }).catch(() => false);
+        // Wait and ensure error message appears before next attempt
+        await page.waitForLoadState('networkidle');
+        await page.waitForTimeout(1500);
+        const otpErrorLocator = page.locator('text=/invalid|incorrect|wrong.*(otp|code)|code.*invalid|code.*incorrect|verification failed|authentication failed/i').first();
+        const otpErrorVisible = await otpErrorLocator.isVisible({ timeout: 20000 }).catch(() => false);
         const lockVisible = await page.locator('text=/locked|blocked|too many attempts|try again later|account.*locked|otp.*locked|verification.*locked/i').first().isVisible({ timeout: 1000 }).catch(() => false);
 
         if (lockVisible) {
-          await captureScreenAtStep(page, 'otp-locked-final');
           return true;
         }
 
@@ -232,8 +197,8 @@ test.describe('Forgot Password negative cases', () => {
             test.skip(true, 'The environment returned to the login page after a wrong OTP attempt.');
             return true;
           }
-          await captureScreenAtStep(page, `wrong-otp-no-error-${attempt}`);
         }
+        // loop continues to trigger fresh inputs for next attempt
       }
       return false;
     }
@@ -263,6 +228,6 @@ test.describe('Forgot Password negative cases', () => {
       }
     }
 
-    await captureScreenAtStep(page, 'test-passed');
+    await saveScreenshot(page, 'forgot-password_otp-locked', 'forgot-password-negative');
   });
 });
