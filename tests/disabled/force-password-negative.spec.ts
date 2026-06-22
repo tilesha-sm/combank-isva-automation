@@ -1,6 +1,6 @@
 /*import { expect, Page, test } from '@playwright/test';
-import { getOtpFromGmail } from '../src/utils/auth-gmail';
-import { FORCE_PASSWORD_CREDENTIALS, DEFAULT_EMAIL_SENDER } from '../src/utils/credentials';
+import { /* removed: getOtpFromGmail */ } from '../src/utils/auth-gmail';
+import { /* removed: FORCE_PASSWORD_CREDENTIALS, DEFAULT_EMAIL_SENDER */ } from '../src/utils/credentials';
 import { fillOtpInputs, selectOtpMethod, waitForOtpInputs } from '../src/utils/otp-utils';
 import { resetToStart } from '../src/utils/flow-utils';
 import { saveScreenshot } from '../src/utils/screenshot-utils';
@@ -35,11 +35,9 @@ test.describe('Force password negative cases', () => {
     await page.waitForTimeout(2000);
     await waitForOtpInputs(page, 90000);
 
-    const otp = await getOtpFromGmail(DEFAULT_EMAIL_SENDER, null, 10, 30000);
-    if (!otp) {
-      throw new Error('OTP not found in Gmail');
-    }
-    await fillOtpInputs(page, otp);
+    const otp = /* mail flow removed for now */ null;
+    // restore OTP handling when re-enabling force tests
+    // await fillOtpInputs(page, otp);
     await page.waitForTimeout(2000);
 
     const currentPasswordInput = page.locator('#currentPassword, input[name="currentPassword"], input[type="password"]:nth-of-type(1)').first();
