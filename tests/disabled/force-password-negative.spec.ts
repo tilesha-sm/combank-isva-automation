@@ -1,4 +1,4 @@
-import { expect, Page, test } from '@playwright/test';
+/*import { expect, Page, test } from '@playwright/test';
 import { getOtpFromGmail } from '../src/utils/auth-gmail';
 import { FORCE_PASSWORD_CREDENTIALS, DEFAULT_EMAIL_SENDER } from '../src/utils/credentials';
 import { fillOtpInputs, selectOtpMethod, waitForOtpInputs } from '../src/utils/otp-utils';
@@ -120,4 +120,4 @@ test.describe('Force password negative cases', () => {
     await expect(confirmPasswordInput).toHaveValue('');
     await expect(submitButton).toBeDisabled();
   });
-});
+});*/

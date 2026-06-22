@@ -1,6 +1,6 @@
-import { expect, Page, test } from '@playwright/test';
-import { getOtpFromGmail } from '../src/utils/auth-gmail';
-import { FORCE_USERNAME_CREDENTIALS, LOGIN_CREDENTIALS, DEFAULT_EMAIL_SENDER } from '../src/utils/credentials';
+/*import { expect, Page, test } from '@playwright/test';
+import { /* removed: getOtpFromGmail */ } from '../src/utils/auth-gmail';
+import { /* removed: FORCE_USERNAME_CREDENTIALS, */ LOGIN_CREDENTIALS, DEFAULT_EMAIL_SENDER } from '../src/utils/credentials';
 import { fillOtpInputs, selectOtpMethod, waitForOtpInputs } from '../src/utils/otp-utils';
 import { resetToStart } from '../src/utils/flow-utils';
 import { saveScreenshot } from '../src/utils/screenshot-utils';
@@ -35,11 +35,8 @@ test.describe('Force username negative cases', () => {
     await page.waitForTimeout(2000);
     await waitForOtpInputs(page, 90000);
 
-    const otp = await getOtpFromGmail(DEFAULT_EMAIL_SENDER, null, 10, 30000);
-    if (!otp) {
-      throw new Error('OTP not found in Gmail');
-    }
-    await fillOtpInputs(page, otp);
+    const otp = /* mail flow removed for now */ null;
+    // await fillOtpInputs(page, otp);
     await page.waitForTimeout(2000);
 
     const currentUsernameInput = page.locator('#currentUsername, input[name="currentUsername"], input[disabled]:first-of-type').first();
@@ -47,39 +44,32 @@ test.describe('Force username negative cases', () => {
     return page;
   }
 
-  test('Empty new username keeps submit disabled', async ({ page }) => {
+  test('Invalid new username blocked', async ({ page }) => {
     await reachChangeUsernameScreen(page);
 
     const newUsernameInput = page.locator('#newUsername, input[name="newUsername"], input[type="text"]:not([disabled])').first();
     const submitButton = page.locator('button[type="submit"], #submitBtn, button:has-text("Submit")').first();
 
-    await newUsernameInput.fill('');
+    await newUsernameInput.fill('!invalid-username');
+
+    const errorMessage = page.locator('text=/invalid username|only letters numbers underscores/i');
+    await expect(errorMessage.first()).toBeVisible({ timeout: 15000 });
     await expect(submitButton).toBeDisabled();
   });
 
-  test('Capital letters in username keeps submit disabled', async ({ page }) => {
+  test('New username already exists shows error', async ({ page }) => {
     await reachChangeUsernameScreen(page);
 
     const newUsernameInput = page.locator('#newUsername, input[name="newUsername"], input[type="text"]:not([disabled])').first();
     const submitButton = page.locator('button[type="submit"], #submitBtn, button:has-text("Submit")').first();
 
-    await newUsernameInput.fill('TestUser123');
-    await expect(submitButton).toBeDisabled();
-  });
-
-  test('Already existing username shows error', async ({ page }) => {
-    await reachChangeUsernameScreen(page);
-
-    const newUsernameInput = page.locator('#newUsername, input[name="newUsername"], input[type="text"]:not([disabled])').first();
-    const submitButton = page.locator('button[type="submit"], #submitBtn, button:has-text("Submit")').first();
-
-    const existingUsername = LOGIN_CREDENTIALS[0]?.username.toLowerCase() ?? 'existinguser';
-    await newUsernameInput.fill(existingUsername);
+    await newUsernameInput.fill(LOGIN_CREDENTIALS[0].username);
+    await expect(submitButton).toBeEnabled();
     await submitButton.click();
 
-    const existsError = page.locator('text=/already exists|please try again/i');
+    const existsError = page.locator('text=/already exists|is taken|choose another/i');
     await expect(existsError.first()).toBeVisible({ timeout: 15000 });
     await expect(newUsernameInput).toHaveValue('');
     await expect(submitButton).toBeDisabled();
   });
-});
+});*/

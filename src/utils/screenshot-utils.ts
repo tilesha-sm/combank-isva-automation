@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import fs from 'fs';
 import path from 'path';
 import { Page } from '@playwright/test';
@@ -16,13 +17,21 @@ function sanitizeFilename(name: string) {
 }
 
 function calculateNextRunNumber(): string {
+  const currentRunFile = path.join(SCREENSHOT_BASE_DIR, '.current-run');
+  try {
+    if (fs.existsSync(currentRunFile)) {
+      const saved = fs.readFileSync(currentRunFile, 'utf-8').trim();
+      if (/^run-\d{3}$/.test(saved)) return saved;
+    }
+  } catch { /* ignore */ }
+
   try {
     if (!fs.existsSync(SCREENSHOT_BASE_DIR)) {
       fs.mkdirSync(SCREENSHOT_BASE_DIR, { recursive: true });
     }
     const entries = fs.readdirSync(SCREENSHOT_BASE_DIR, { withFileTypes: true })
-      .filter((d) => d.isDirectory())
-      .map((d) => d.name);
+      .filter((d: any) => d.isDirectory())
+      .map((d: any) => d.name);
     const runRegex = /^run-(\d{3})$/;
     let max = 0;
     for (const name of entries) {
@@ -32,8 +41,9 @@ function calculateNextRunNumber(): string {
         if (!Number.isNaN(n) && n > max) max = n;
       }
     }
-    const next = String(max + 1).padStart(3, '0');
-    return `run-${next}`;
+    const next = `run-${String(max + 1).padStart(3, '0')}`;
+    fs.writeFileSync(currentRunFile, next, 'utf-8');
+    return next;
   } catch (e) {
     return 'run-001';
   }
@@ -63,7 +73,7 @@ export async function saveScreenshot(page: Page, name: string, testType: 'login'
     // Determine next 3-digit prefix based on existing files in dir
     let counter = 1;
     try {
-      const files = fs.readdirSync(dir).filter((f) => /^\d{3}-.+\.png$/.test(f));
+      const files = fs.readdirSync(dir).filter((f: string) => /^\d{3}-.+\.png$/.test(f));
       if (files.length > 0) {
         let max = 0;
         for (const f of files) {

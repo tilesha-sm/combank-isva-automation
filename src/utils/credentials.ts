@@ -29,17 +29,6 @@ export const FORGOT_PASSWORD_CREDENTIALS: ForgotPasswordCredential[] = [
   
 ];
 
-export const FORCE_PASSWORD_CREDENTIALS: ForcePasswordCredential = {
-  username: 'Tilesha01',
-  password: 'Combank@123',
-  newPassword: 'Combank@456',
-};
-
-export const FORCE_USERNAME_CREDENTIALS: ForceUsernameCredential = {
-  username: 'Tilesha01',
-  password: 'Combank@123',
-  newUsername: 'tilesha01new',
-};
 
 function chooseRandom<T>(items: T[]): T {
   return items[Math.floor(Math.random() * items.length)];
@@ -68,3 +57,4 @@ export function getForgotPasswordCredential(preferredUsername?: string): ForgotP
 }
 
 export const DEFAULT_EMAIL_SENDER = 'SecurityVerification@combank.net';
+
