@@ -1,6 +1,6 @@
 /*import { expect, Page, test } from '@playwright/test';
 import { /* removed: getOtpFromGmail */ } from '../src/utils/auth-gmail';
-import { /* removed: FORCE_USERNAME_CREDENTIALS, */ LOGIN_CREDENTIALS, DEFAULT_EMAIL_SENDER } from '../src/utils/credentials';
+import { /* removed: FORCE_USERNAME_CREDENTIALS, DEFAULT_EMAIL_SENDER */ LOGIN_CREDENTIALS } from '../src/utils/credentials';
 import { fillOtpInputs, selectOtpMethod, waitForOtpInputs } from '../src/utils/otp-utils';
 import { resetToStart } from '../src/utils/flow-utils';
 import { saveScreenshot } from '../src/utils/screenshot-utils';
