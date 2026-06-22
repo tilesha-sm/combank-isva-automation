@@ -2,12 +2,14 @@
     "cSpell.words": [
         "Combank",
         "domcontentloaded",
+        "existinguser",
         "ISVA",
         "networkidle",
         "pasanqa",
         "tempuser",
         "testmas",
-        "Tilesha"
+        "Tilesha",
+        "uatisvaext"
     ],
     "robotcode.disableExtension": true,
     "chat.tools.terminal.autoApprove": {
