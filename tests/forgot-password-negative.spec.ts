@@ -1,7 +1,6 @@
-import { expect, Page, test } from '@playwright/test';
-import { clickForgotPassword, fillOtpInputs, selectOtpMethod, waitForOtpInputs } from '../src/utils/otp-utils';
-import { resetToStart as resetFlowToStart } from '../src/utils/flow-utils';
-import { saveScreenshot } from '../src/utils/screenshot-utils';
+import { expect, test } from './hooks';
+import type { Page } from '@playwright/test';
+import { clickForgotPassword, fillOtpInputs, selectOtpMethod, waitForOtpInputs, resetToStart as resetFlowToStart, saveScreenshot } from '../src/utils';
 
 const VALID_FORGOT_USERNAME = 'pasanqa1';
 const NON_EXISTENT_USERNAME = 'no.such.user.1234';

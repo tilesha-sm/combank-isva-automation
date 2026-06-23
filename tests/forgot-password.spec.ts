@@ -1,9 +1,5 @@
-import { expect, test } from '@playwright/test';
-import { getForgotPasswordCredential, DEFAULT_EMAIL_SENDER } from '../src/utils/credentials';
-import { getOtpFromGmail } from '../src/utils/auth-gmail';
-import { fillOtpInputs, selectOtpMethod, waitForAndClick, waitForOtpInputs } from '../src/utils/otp-utils';
-import { START_URL, gotoWith502Check, is502Page, resetToStart } from '../src/utils/flow-utils';
-import { saveScreenshot } from '../src/utils/screenshot-utils';
+import { expect, test } from './hooks';
+import { getForgotPasswordCredential, DEFAULT_EMAIL_SENDER, getOtpFromGmail, fillOtpInputs, selectOtpMethod, waitForAndClick, waitForOtpInputs, START_URL, gotoWith502Check, is502Page, resetToStart, saveScreenshot } from '../src/utils';
 
 
 test.setTimeout(180000);
@@ -52,9 +48,8 @@ test('Forgot Password flow', async ({ page }) => {
       try {
         await gotItBtn.waitFor({ state: 'visible', timeout: 10000 });
         await gotItBtn.click({ force: true });
-        console.log('Dismissed active-session warning');
       } catch {
-        console.log('No active-session warning found');
+        // no interstitial appeared
       }
 
       // Wait for the OTP/verification screen to become available.
@@ -87,7 +82,7 @@ test('Forgot Password flow', async ({ page }) => {
         throw new Error('OTP not found in Gmail for forgot-password flow');
       }
 
-      console.log('OTP received from email:', otp);
+      // OTP received from email (redacted in logs)
       await fillOtpInputs(pageToUse, otp);
 
       if (await is502Page(pageToUse)) {
@@ -102,7 +97,7 @@ test('Forgot Password flow', async ({ page }) => {
       const closedError = /closed/i.test(msg) || /Target page, context or browser has been closed/i.test(msg);
       const sessionTimeoutError = /session.*timeout|session has ended|login again/i.test(msg);
       if ((found502 || closedError || sessionTimeoutError) && attempt < MAX_ATTEMPTS) {
-        console.log(`Detected 502/closed/browser timeout — restarting flow (attempt ${attempt + 1}/${MAX_ATTEMPTS})`);
+        // Detected 502/closed/browser timeout — restarting flow
         currentPage = await resetToStart(currentPage);
         continue;
       }

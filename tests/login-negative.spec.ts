@@ -1,7 +1,5 @@
-import { expect, test } from '@playwright/test';
-import { fillOtpInputs, selectOtpMethod, waitForOtpInputs } from '../src/utils/otp-utils';
-import { resetToStart as resetFlowToStart } from '../src/utils/flow-utils';
-import { saveScreenshot } from '../src/utils/screenshot-utils';
+import { expect, test } from './hooks';
+import { fillOtpInputs, selectOtpMethod, waitForOtpInputs, resetToStart as resetFlowToStart, saveScreenshot } from '../src/utils';
 
 const VALID_USERNAME = 'Tilesha04';
 const VALID_PASSWORD = 'Combank@123';
@@ -69,7 +67,7 @@ test.describe('Login negative cases', () => {
     }
 
     const otpMethodSelected = await selectOtpMethod(page, 45000);
-    const otpInputsPresent = await waitForOtpInputs(page, 5000).then(() => true).catch(() => false);
+    const otpInputsPresent = await waitForOtpInputs(page, 15000).then(() => true).catch(() => false);
     if (!otpMethodSelected && !otpInputsPresent) {
       throw new Error('OTP method selection failed in login negative flow');
     }

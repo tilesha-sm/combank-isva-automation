@@ -1,5 +1,75 @@
+/// <reference types="node" />
+import fs from 'fs';
+import path from 'path';
 import { Page } from '@playwright/test';
 
+// ============= FLOW UTILITIES =============
+export const START_URL = 'https://uatisvaext.combank.net/mga/sps/oauth/oauth20/authorize?response_type=code&client_id=iCashProGUISSO&redirect_uri=https%3A%2F%2Ftest.com%2Fcallback&scope=openid&state=76677667';
+
+const CLOSED_PAGE_REGEX = /closed/i;
+
+export function isClosedPageError(error: unknown): boolean {
+  const message =
+    error && typeof error === 'object' && 'message' in error
+      ? (error as any).message
+      : String(error);
+  return CLOSED_PAGE_REGEX.test(message) || /Target page, context or browser has been closed/i.test(message as string);
+}
+
+export async function is502Page(page: Page): Promise<boolean> {
+  try {
+    const title = await page.title().catch(() => '');
+    if (/502|Bad Gateway/i.test(title)) return true;
+
+    const content = await page.content().catch(() => '');
+    if (/502 Bad Gateway|Bad Gateway|502/i.test(content)) return true;
+
+    if (await page.locator('text=/502/').first().isVisible().catch(() => false)) return true;
+    if (await page.locator('text=/Bad Gateway/i').first().isVisible().catch(() => false)) return true;
+
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+export async function gotoWith502Check(page: Page, url: string, options: Parameters<Page['goto']>[1] = {}) {
+  const response = await page.goto(url, options);
+  if (response?.status() === 502) {
+    throw new Error('Detected 502 Bad Gateway on navigation');
+  }
+  return response;
+}
+
+export async function resetToStart(page: Page): Promise<Page> {
+  try {
+    if (page.isClosed()) {
+      return page.context().newPage();
+    }
+  } catch {
+    // continue
+  }
+
+  try {
+    await page.context().clearCookies();
+  } catch {}
+
+  try {
+    if (page.isClosed()) {
+      return page.context().newPage();
+    }
+    await gotoWith502Check(page, START_URL, { waitUntil: 'load', timeout: 120000 });
+    await page.waitForLoadState('networkidle', { timeout: 120000 }).catch(() => {});
+    return page;
+  } catch (error) {
+    if (isClosedPageError(error)) {
+      return page.context().newPage();
+    }
+    return page;
+  }
+}
+
+// ============= OTP UTILITIES =============
 export async function waitForAndClick(page: Page, selector: string, label: string, timeoutMs = 10000) {
   const locator = page.locator(selector).first();
 
@@ -31,7 +101,7 @@ export async function clickForgotPassword(page: Page, timeoutMs = 15000) {
     '#home_forgot_Password',
     'a:has-text("Forgot password")',
     'button:has-text("Forgot password")',
-    'text=/Forgot password\s*\?/i',
+    'text=/Forgot password\\s*\\?/i',
     'text=/Forgot password/i',
   ];
 
@@ -55,71 +125,58 @@ export async function clickForgotPassword(page: Page, timeoutMs = 15000) {
 }
 
 export async function selectOtpMethod(page: Page, timeoutMs = 45000) {
-  // Check if OTP inputs are already visible
   try {
     const inputs = await waitForOtpInputs(page, 3000);
     if (inputs.length > 0) return true;
   } catch {
-    // No inputs yet, continue to selection
+    // No inputs yet
   }
 
   const deadline = Date.now() + timeoutMs;
+  await page
+    .locator('text=/Please select a method to receive your verification code|Two Factor Authentication/i')
+    .first()
+    .waitFor({ state: 'visible', timeout: Math.min(15000, deadline - Date.now()) })
+    .catch(() => {});
 
-  // Primary selector targeting email OTP button by role
-  const emailButton = page.getByRole('button', { name: /request otp to email|email.*otp|otp.*email/i }).first();
-
-  // Additional fallback candidates
-  const candidates = [
-    emailButton,
-    page.getByRole('button', { name: /request otp to email/i }).first(),
-    page.getByRole('button', { name: /email/i }).first(),
+  const emailButton = page.locator('#email').first();
+  const fallbackButtons = [
+    page.locator('button#email').first(),
     page.locator('button:has-text("Request OTP to email")').first(),
-    page.locator('button').filter({ hasText: /request otp to email/i }).first(),
+    page.getByRole('button', { name: /request otp to email|email.*otp|otp.*email/i }).first(),
+    page.locator('text=/Request OTP to email/i').first(),
   ];
 
-  for (const locator of candidates) {
-    const remainingMs = Math.max(1000, deadline - Date.now());
-    if (remainingMs <= 0) break;
+  const clickCandidate = async (locator: ReturnType<Page['locator']>) => {
+    const visible = await locator.isVisible({ timeout: 3000 }).catch(() => false);
+    if (!visible) return false;
+    const enabled = await locator.isEnabled({ timeout: 2000 }).catch(() => false);
+    if (!enabled) return false;
+
+    await locator.scrollIntoViewIfNeeded().catch(() => {});
 
     try {
-      const visible = await locator.isVisible({ timeout: Math.min(3000, remainingMs) }).catch(() => false);
-      if (visible) {
-        // Ensure button is enabled and stable
-        try {
-          await locator.isEnabled({ timeout: 2000 });
-        } catch {
-          continue;
-        }
-
-        await locator.click({ force: true, timeout: 5000 });
-        
-        // Wait for page transition
-        await page.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => {});
-        await page.waitForLoadState('load').catch(() => {});
-        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        await page.waitForTimeout(2000);
-
-        // After clicking an OTP method, wait for the selection buttons/context to disappear
-        try {
-          await page
-            .locator('text=/request otp to email|request otp to mobile|select.*otp method|choose.*otp method/i')
-            .first()
-            .waitFor({ state: 'hidden', timeout: 10000 });
-        } catch {
-          // Not fatal - continue to check for inputs
-        }
-
-        // Check if OTP inputs appeared
-        try {
-          const inputs = await waitForOtpInputs(page, 10000);
-          if (inputs.length > 0) return true;
-        } catch {
-          // continue to next selector
-        }
-      }
+      await Promise.all([
+        locator.click({ force: true, timeout: 5000 }),
+        page.waitForURL(/StateId=|otp.*code|authsvc\?StateId=/, { timeout: 10000 }).catch(() => {}),
+      ]);
     } catch {
-      // ignore and continue
+      return false;
     }
+
+    await page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
+    await page.waitForLoadState('load', { timeout: 10000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(2000);
+
+    return await waitForOtpInputs(page, Math.min(30000, deadline - Date.now()))
+      .then((inputs) => inputs.length > 0)
+      .catch(() => false);
+  };
+
+  if (await clickCandidate(emailButton)) return true;
+  for (const button of fallbackButtons) {
+    if (await clickCandidate(button)) return true;
   }
 
   return false;
@@ -227,7 +284,6 @@ export async function waitForOtpInputs(page: Page, timeoutMs = 90000) {
 export async function fillOtpInputs(page: Page, otp: string) {
   const digits = otp.trim().split('');
   const inputs = await waitForOtpInputs(page, 30000);
-  // Ensure first OTP input is visible and editable — fail fast if we're on wrong screen
   if (!inputs || inputs.length === 0) {
     throw new Error('OTP input boxes are not ready — fillOtpInputs called on wrong screen');
   }
@@ -244,7 +300,7 @@ export async function fillOtpInputs(page: Page, otp: string) {
   } catch (e) {
     throw new Error('OTP input boxes are not ready — fillOtpInputs called on wrong screen');
   }
-  // If multiple inputs, try to sort by numeric id suffix (otp1, otp2, ...)
+
   let ordered = inputs;
   try {
     const withId = await Promise.all(
@@ -264,26 +320,20 @@ export async function fillOtpInputs(page: Page, otp: string) {
       ordered = numeric.map((x) => x.loc);
     }
   } catch (e) {
-    // ignore ordering errors and keep DOM order
+    // ignore
   }
 
   if (ordered.length === 1) {
-    // Single OTP input - fill entire OTP
     await ordered[0].waitFor({ state: 'visible', timeout: 30000 });
     try {
       await ordered[0].fill(otp);
     } catch {
-      // Try click first, then fill
       await ordered[0].click({ force: true });
       await ordered[0].fill(otp);
     }
     return;
   }
 
-  // Multiple OTP inputs - fill them digit-by-digit. This avoids entering the whole
-  // code into the first box and then re-filling the remaining fields.
-  // Some pages keep only the active box enabled and unlock the next box from
-  // oninput/onkeyup handlers.
   const requiredFills = Math.min(ordered.length, digits.length);
 
   for (let i = 0; i < requiredFills; i++) {
@@ -300,20 +350,17 @@ export async function fillOtpInputs(page: Page, otp: string) {
 
     let filled = false;
 
-    // Try 1: click + type, which triggers the same keyboard handlers as a user.
     try {
       await input.click({ force: true });
       await input.type(digits[i], { delay: 50 });
       filled = true;
     } catch {
       try {
-        // Try 2: clear/fill only when the field is editable.
         await input.focus();
         await input.fill(digits[i]);
         filled = true;
       } catch {
         try {
-          // Try 3: direct DOM update plus input/keyup events for custom handlers.
           await input.evaluate((element: HTMLInputElement, digit: string) => {
             element.value = digit;
             element.dispatchEvent(new Event('input', { bubbles: true }));
@@ -321,7 +368,7 @@ export async function fillOtpInputs(page: Page, otp: string) {
           }, digits[i]);
           filled = true;
         } catch {
-          // Continue to the explicit failure below.
+          // continue
         }
       }
     }
@@ -332,4 +379,122 @@ export async function fillOtpInputs(page: Page, otp: string) {
 
     await page.waitForTimeout(100);
   }
+}
+
+// ============= SCREENSHOT UTILITIES =============
+const SCREENSHOT_BASE_DIR = path.join(process.cwd(), 'artifacts', 'screenshots');
+let RUN_DIR_NAME = '';
+let SCREENSHOT_DIR = '';
+let isInitialized = false;
+
+function sanitizeFilename(name: string) {
+  return name
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-zA-Z0-9-_.]/g, '')
+    .replace(/-+/g, '-');
+}
+
+function calculateNextRunNumber(): string {
+  const currentRunFile = path.join(SCREENSHOT_BASE_DIR, '.current-run');
+  try {
+    if (fs.existsSync(currentRunFile)) {
+      const saved = fs.readFileSync(currentRunFile, 'utf-8').trim();
+      if (/^run-\d{3}$/.test(saved)) {
+        const savedDir = path.join(SCREENSHOT_BASE_DIR, saved);
+        if (fs.existsSync(savedDir)) {
+          return saved;
+        }
+      }
+    }
+  } catch { /* ignore */ }
+
+  try {
+    if (!fs.existsSync(SCREENSHOT_BASE_DIR)) {
+      fs.mkdirSync(SCREENSHOT_BASE_DIR, { recursive: true });
+    }
+    const entries = fs.readdirSync(SCREENSHOT_BASE_DIR, { withFileTypes: true })
+      .filter((d: any) => d.isDirectory())
+      .map((d: any) => d.name);
+    const runRegex = /^run-(\d{3})$/;
+    let max = 0;
+    for (const name of entries) {
+      const m = name.match(runRegex);
+      if (m) {
+        const n = parseInt(m[1], 10);
+        if (!Number.isNaN(n) && n > max) max = n;
+      }
+    }
+    const next = `run-${String(max + 1).padStart(3, '0')}`;
+    fs.writeFileSync(currentRunFile, next, 'utf-8');
+    return next;
+  } catch (e) {
+    return 'run-001';
+  }
+}
+
+function ensureRunDir(browserName = (process.env.BROWSER_NAME || 'chromium'), testType = 'login') {
+  if (!isInitialized) {
+    RUN_DIR_NAME = calculateNextRunNumber();
+    SCREENSHOT_DIR = path.join(SCREENSHOT_BASE_DIR, RUN_DIR_NAME);
+    fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
+    isInitialized = true;
+  }
+
+  const browser = (String(browserName || 'chromium')).toLowerCase().replace(/\s+/g, '-');
+  const typeDir = String(testType || 'login');
+  const fullDir = path.join(SCREENSHOT_DIR, browser, typeDir);
+  fs.mkdirSync(fullDir, { recursive: true });
+  return fullDir;
+}
+
+export async function saveScreenshot(page: Page, name: string, testType: 'login' | 'forgot-password' | 'login-negative' | 'forgot-password-negative' | 'force-password' | 'force-password-negative' | 'force-username' | 'force-username-negative' = 'login') {
+  try {
+    const browserName = (process.env.BROWSER_NAME || 'chromium').toLowerCase().replace(/\s+/g, '-');
+    const dir = ensureRunDir(browserName, testType);
+
+    let counter = 1;
+    try {
+      const files = fs.readdirSync(dir).filter((f: string) => /^\d{3}-.+\.png$/.test(f));
+      if (files.length > 0) {
+        let max = 0;
+        for (const f of files) {
+          const m = f.match(/^(\d{3})-/);
+          if (m) {
+            const n = parseInt(m[1], 10);
+            if (!Number.isNaN(n) && n > max) max = n;
+          }
+        }
+        counter = max + 1;
+      }
+    } catch (e) {
+      counter = 1;
+    }
+
+    const paddedCount = String(counter).padStart(3, '0');
+    const browserDisplay = String(browserName || 'chromium').replace(/\s+/g, '-');
+    const fileName = `${browserDisplay}-${paddedCount}-${sanitizeFilename(name).replace(/\.png$/i, '')}.png`;
+    const filePath = path.join(dir, fileName);
+    await page.screenshot({ path: filePath, fullPage: true });
+    return filePath;
+  } catch (error) {
+    console.warn(`Failed to save screenshot: ${error}`);
+  }
+}
+
+export async function setupAutoScreenshots(page: Page) {
+  page.on('framenavigated', async () => {});
+  page.on('dialog', async () => {});
+  const originalLocator = page.locator.bind(page);
+  page.locator = function (selector: string) {
+    return originalLocator(selector);
+  };
+}
+
+export function getScreenshotBaseDir() {
+  return SCREENSHOT_BASE_DIR;
+}
+
+export function getScreenshotRunDirName() {
+  return RUN_DIR_NAME;
 }

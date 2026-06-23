@@ -219,9 +219,4 @@ export async function getOtpFromGmail(
   return null;
 }
 
-// Entry point commented out — use test-gmail.ts instead
-// async function main() {
-//   const otp = await getOtpFromGmail();
-//   console.log("FINAL OTP RESULT:", otp);
-// }
-// main().catch(console.error);
+// Entry point removed — use `test-gmail.ts` or call `getOtpFromGmail` from tests.
